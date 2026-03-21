@@ -1,0 +1,14 @@
+{
+  "name": "tsqflix",
+  "private": true,
+  "scripts": {
+    "backend": "dotenv -e .env -- npm --prefix backend run start",
+    "frontend": "node scripts/run-frontend.js",
+    "dev": "concurrently --names backend,frontend --kill-others-on-fail \"npm:backend\" \"npm:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "dotenv": "^16.4.7",
+    "dotenv-cli": "^7.2.0"
+  }
+}

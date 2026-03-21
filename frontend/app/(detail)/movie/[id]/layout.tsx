@@ -1,0 +1,140 @@
+import Link from "next/link"
+import { notFound } from "next/navigation"
+import { pages, siteConfig } from "@/config"
+import { tmdb } from "@/tmdb/api"
+import { WithVideos } from "@/tmdb/api/types"
+import { format } from "@/tmdb/utils"
+
+import { Tabs, TabsLink, TabsList } from "@/components/ui/tabs"
+import { MediaBackdrop } from "@/components/media/media-backdrop"
+import { MediaDetailView } from "@/components/media/media-detail-view"
+import { MediaPoster } from "@/components/media/media-poster"
+import { MediaRating } from "@/components/media/media-rating"
+import { MediaTrailerDialog } from "@/components/media/media-trailer-dialog"
+import { ScrollFixer } from "@/components/shared/scroll-fixer"
+
+interface DetailLayoutProps {
+  params: {
+    id: string
+  }
+  children: React.ReactNode
+}
+
+export async function generateMetadata({ params }: DetailLayoutProps) {
+  const { title } = await tmdb.movie.detail({
+    id: params.id,
+  })
+
+  return {
+    title: {
+      default: title,
+      template: `%s - ${title} - ${siteConfig.name}`,
+    },
+  }
+}
+
+export default async function DetailLayout({
+  params,
+  children,
+}: DetailLayoutProps) {
+  const {
+    id,
+    adult,
+    title,
+    overview,
+    genres,
+    vote_average,
+    vote_count,
+    backdrop_path,
+    poster_path,
+    tagline,
+    videos,
+  } = await tmdb.movie.detail<WithVideos>({
+    id: params.id,
+    append: "videos",
+  })
+
+  if (!id || adult) return notFound()
+
+  return (
+    <MediaDetailView.Root>
+      <ScrollFixer />
+
+      <MediaDetailView.Backdrop>
+        <MediaBackdrop image={backdrop_path} alt={title} priority />
+      </MediaDetailView.Backdrop>
+
+      <MediaDetailView.Hero>
+        <MediaDetailView.Poster>
+          <MediaPoster image={poster_path} alt={title} size="w780" priority />
+        </MediaDetailView.Poster>
+
+        <div className="space-y-4">
+          <MediaDetailView.Genres>
+            <MediaRating average={vote_average} count={vote_count} />
+
+            {genres?.map((genre) => (
+              <Link
+                key={genre.id}
+                href={`${pages.movie.discover.link}?with_genres=${genre.id}`}
+              >
+                <MediaDetailView.Genre key={genre.id}>
+                  {genre.name}
+                </MediaDetailView.Genre>
+              </Link>
+            ))}
+          </MediaDetailView.Genres>
+
+          <MediaDetailView.Title>{title}</MediaDetailView.Title>
+
+          {tagline && (
+            <MediaDetailView.Overview>
+              &quot;{tagline}&quot;
+            </MediaDetailView.Overview>
+          )}
+
+          <MediaDetailView.Overview
+            dangerouslySetInnerHTML={{ __html: format.content(overview) }}
+          />
+
+          <MediaTrailerDialog videos={videos?.results} />
+        </div>
+      </MediaDetailView.Hero>
+
+      <MediaDetailView.Content>
+        <Tabs className="mt-12 w-full">
+          <div className="max-w-screen scrollbar-hidden -mx-8 overflow-x-scroll px-8 lg:m-0 lg:p-0">
+            <TabsList>
+              <TabsLink href={`${pages.movie.root.link}/${id}`}>
+                Overview
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/credits`}>
+                Credits
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/watch`}>
+                Watch
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/reviews`}>
+                Reviews
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/images`}>
+                Images
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/videos`}>
+                Videos
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/recommendations`}>
+                Recommendations
+              </TabsLink>
+              <TabsLink href={`${pages.movie.root.link}/${id}/similar`}>
+                Similar
+              </TabsLink>
+            </TabsList>
+          </div>
+        </Tabs>
+
+        <div className="mt-4">{children}</div>
+      </MediaDetailView.Content>
+    </MediaDetailView.Root>
+  )
+}

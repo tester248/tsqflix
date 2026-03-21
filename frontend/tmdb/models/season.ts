@@ -1,0 +1,29 @@
+import { Crew, GuestStar } from "./credits"
+
+export type Episode = {
+  air_date: string
+  episode_number: number
+  crew: Crew[]
+  guest_stars: GuestStar[]
+  id: number
+  name: string
+  overview: string
+  production_code: string
+  season_number: number
+  still_path: string
+  vote_average: number
+  vote_count: number
+  runtime: number
+  show_id: number
+}
+
+export type SeasonDetails = {
+  air_date: string
+  episodes: Episode[]
+  name: string
+  overview: string
+  id: number
+  poster_path?: string
+  season_number: number
+  vote_average: number
+}
