@@ -8,6 +8,7 @@ import { getCountryName } from "@/lib/utils"
 import { MovieHero } from "@/components/movie/movie-hero"
 import { TrendCarousel } from "@/components/trend/trend-carousel"
 import { TvHero } from "@/components/tv/tv-hero"
+import { ContinueWatchingSection } from "@/components/home/continue-watching"
 
 export const metadata: Metadata = {
   title: "Home",
@@ -42,6 +43,7 @@ export default async function Home() {
     <section>
       <div className="container space-y-8">
         <MovieHero movies={movies} label="Trending Now" priority />
+        <ContinueWatchingSection />
 
         <TrendCarousel
           type="movie"

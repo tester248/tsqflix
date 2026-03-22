@@ -35,16 +35,7 @@ export const SiteFooter: React.FC<ComponentProps<"footer">> = () => {
           <div className="flex flex-col justify-between gap-12 xl:flex-row xl:items-center">
             <div className="text-sm text-muted-foreground">
               <p>
-                &copy; {year}{" "}
-                <a
-                  href={siteConfig.author.web}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="border-b text-foreground"
-                >
-                  {siteConfig.author.name}
-                </a>{" "}
-                &mdash; All rights reserved.
+                &copy; {year} TSQFLIX — <span>Open Source Cinema</span>
               </p>
               <p>
                 Built with{" "}

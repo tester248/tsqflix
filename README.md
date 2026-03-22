@@ -5,9 +5,12 @@ TSQFLIX is a high-performance, resilient streaming platform that bridges the gap
 ## 🌟 Key Features
 
 ### 💎 Premium Playback Experience
-- **ACES Tone Mapping**: Synthetic HDR-to-SDR tone mapping for HDR10 and Dolby Vision content. Say goodbye to washed-out colors on standard displays.
-- **Resilient Streaming**: Upgraded HLS.js engine with aggressive buffering and auto-recovery for zero-interruption playback.
+- **HLS Proxy + Segment Cache**: All HLS streams are routed through a local backend proxy that caches downloaded segments in memory. Seeks and stalls are served instantly — no CDN round-trips, no restarts from the beginning.
+- **Calibrated Tone Mapping**: HDR10, Dolby Vision, and SDR Boost modes that correctly reduce highlight luminance before restoring contrast and color — the right order for proper SDR display correction.
+- **Resilient Streaming**: HLS.js configured for VOD with deep buffering. Network errors no longer destroy the player session — retries are transparent.
 - **Dynamic Quality Selection**: Seamlessly switch between resolutions with instant keyframe seeking.
+- **Multi-Language Audio**: Automatic audio track detection and switching for multi-language HLS streams.
+- **VidSrc Fullscreen**: Full fullscreen support for the VidSrc backup player via a dedicated browser-native button.
 
 ### 🛡️ Unmatched Resilience
 - **Infinite Retry Engine**: TMDB requests now feature a 50-attempt auto-retry system with intelligent backoff.

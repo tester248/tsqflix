@@ -135,6 +135,89 @@ app.get('/api/febbox/links', async (req, res) => {
     }
 });
 
+// ─── HLS Proxy + Segment Cache ────────────────────────────────────────────
+// Segments are immutable so we cache them in memory for fast re-requests
+const segmentCache = new Map(); // url -> { buf: Buffer, ts: number }
+const SEGMENT_TTL = 60 * 60 * 1000; // 1 hour
+const SEGMENT_MAX = 300;             // ~300 segments ≈ up to ~1.5 GB at 4K
+
+app.get('/api/hls-proxy', async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send('Missing url param');
+
+    const isM3u8 = targetUrl.includes('.m3u8');
+
+    // Serve binary segments from cache if available
+    if (!isM3u8 && segmentCache.has(targetUrl)) {
+        const cached = segmentCache.get(targetUrl);
+        if (Date.now() - cached.ts < SEGMENT_TTL) {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Content-Type', 'video/mp2t');
+            res.setHeader('X-Cache', 'HIT');
+            return res.end(cached.buf);
+        } else {
+            segmentCache.delete(targetUrl);
+        }
+    }
+    try {
+        const response = await fetch(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135.0.0.0',
+                'Referer': 'https://www.febbox.com/',
+                'Origin': 'https://www.febbox.com',
+            }
+        });
+
+        if (!response.ok) {
+            console.error(`[HLS Proxy] Failed to fetch ${targetUrl}: ${response.status}`);
+            return res.status(response.status).send('Upstream error');
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Content-Type', contentType);
+
+        const isM3u8 = targetUrl.includes('.m3u8') || contentType.includes('mpegurl');
+
+        if (isM3u8) {
+            // Rewrite all URIs in the manifest to go through our proxy
+            const body = await response.text();
+            const baseUrl = new URL(targetUrl);
+            const proxyBase = `${req.protocol}://${req.get('host')}/api/hls-proxy?url=`;
+
+            const rewritten = body.split('\n').map(line => {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('#')) return line;
+                try {
+                    const absoluteUrl = trimmed.startsWith('http')
+                        ? trimmed
+                        : new URL(trimmed, baseUrl).href;
+                    return proxyBase + encodeURIComponent(absoluteUrl);
+                } catch {
+                    return line;
+                }
+            }).join('\n');
+
+            res.send(rewritten);
+        } else {
+            // Binary segment – cache then serve
+            const buf = Buffer.from(await response.arrayBuffer());
+
+            // Evict oldest if cache full
+            if (segmentCache.size >= SEGMENT_MAX) {
+                segmentCache.delete(segmentCache.keys().next().value);
+            }
+            segmentCache.set(targetUrl, { buf, ts: Date.now() });
+
+            res.end(buf);
+        }
+    } catch (err) {
+        console.error(`[HLS Proxy] Error: ${err.message}`);
+        res.status(500).send(err.message);
+    }
+});
+
 // Start the server
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

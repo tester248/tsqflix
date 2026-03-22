@@ -18,7 +18,7 @@ import { pages } from "@/config/pages"
 export type SiteConfig = typeof siteConfig
 
 export const siteConfig = {
-  name: "Movies App",
+  name: "TSQFLIX",
   description:
     "Millions of movies, TV shows and people to discover. Explore now.",
   mainNav: [
@@ -28,15 +28,15 @@ export const siteConfig = {
     },
   ],
   links: {
-    github: "https://github.com/oktay/movies",
+    github: "https://github.com/tester248/tsqflix",
     next: "https://nextjs.org",
     vercel: "https://vercel.com",
     tmdb: "https://www.themoviedb.org",
     shadcn: "https://ui.shadcn.com/",
   },
   author: {
-    name: "Oktay Colakoglu",
-    web: "https://oktaycolakoglu.com",
+    name: "Tester248",
+    web: "https://github.com/tester248",
   },
 }
 

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import Link from "next/link"
 import { pages } from "@/config"
 import { tmdb } from "@/tmdb/api"
@@ -16,6 +17,8 @@ import {
 import { MediaBackdrop } from "@/components/media/media-backdrop"
 
 export default async function Detail({ params }: { params: { id: string } }) {
+  // Always land on Seasons first for TV shows as requested
+  redirect(`${pages.tv.root.link}/${params.id}/seasons`)
   const {
     first_air_date,
     last_air_date,

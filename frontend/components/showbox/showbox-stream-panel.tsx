@@ -280,25 +280,25 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
               </div>
            </div>
 
-           {searchResults.length > 1 && (
-              <div className="space-y-3 pt-4 border-t border-white/5">
-                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
-                 <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
-                    {searchResults.map(res => (
-                       <button 
-                         key={res.id}
-                         onClick={() => setSelectedResult(res)}
-                         className={cn(
-                           "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
-                           selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                         )}
-                       >
-                          {res.title} ({res.year})
-                       </button>
-                    ))}
-                 </div>
-              </div>
-           )}
+            {Array.isArray(searchResults) && searchResults.length > 1 && (
+               <div className="space-y-3 pt-4 border-t border-white/5">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
+                     {searchResults.map(res => (
+                        <button 
+                          key={res.id}
+                          onClick={() => setSelectedResult(res)}
+                          className={cn(
+                            "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
+                            selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                          )}
+                        >
+                           {res.title} ({res.year})
+                        </button>
+                     ))}
+                  </div>
+               </div>
+            )}
         </div>
 
         <div className="lg:col-span-8 space-y-6">
@@ -347,7 +347,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
                       </div>
                       <div className="space-y-1 max-h-64 overflow-y-auto pr-2 scrollbar-thin">
                          {loadingPhase !== 'ready' ? [1,2,3].map(i => <Skeleton key={i} className="h-10 w-full mb-1" />) : 
-                           files.map(f => (
+                           Array.isArray(files) && files.map(f => (
                              <button
                                key={f.fid}
                                onClick={() => handleFileSelect(f)}
@@ -368,7 +368,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Resolutions</p>
                       <div className="flex flex-wrap gap-2">
                          {qualitiesLoading ? [1,2].map(i => <Skeleton key={i} className="h-8 w-20" />) : 
-                           qualities.map(q => (
+                           Array.isArray(qualities) && qualities.map(q => (
                              <button
                                key={q.url}
                                onClick={() => setPlayerUrl(q.url)}
@@ -381,34 +381,49 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
                              </button>
                            ))
                          }
-                         {!qualities.length && !qualitiesLoading && activeFile && <p className="text-[10px] text-zinc-600">No alternate links</p>}
+                         {!qualities?.length && !qualitiesLoading && activeFile && <p className="text-[10px] text-zinc-600">No alternate links</p>}
                       </div>
                    </div>
                 </div>
               </>
            ) : (
-              <div className="space-y-4">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                       <Zap className="size-4 text-emerald-500 fill-emerald-500" />
-                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">Backup Server Active</span>
-                    </div>
-                 </div>
-                 <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/5 bg-black shadow-2xl">
-                    <iframe 
-                      src={playerUrl || ""} 
-                      className="size-full border-0" 
-                      allowFullScreen 
-                      allow="autoplay; fullscreen"
-                    />
-                 </div>
-                 <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                    <p className="text-xs text-emerald-500/80 leading-relaxed font-medium">
-                       Note: VidSrc uses third-party servers. We recommend an <b>Ad-Blocker</b> for this backup source.
-                    </p>
-                 </div>
-              </div>
-           )}
+               <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                        <Zap className="size-4 text-emerald-500 fill-emerald-500" />
+                        <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">Backup Server Active</span>
+                     </div>
+                     <button
+                       onClick={() => {
+                         const iframe = document.getElementById("vidsrc-iframe") as HTMLIFrameElement | null
+                         if (iframe?.requestFullscreen) {
+                           iframe.requestFullscreen()
+                         } else if ((iframe as any)?.webkitRequestFullscreen) {
+                           (iframe as any).webkitRequestFullscreen()
+                         }
+                       }}
+                       className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-zinc-800 px-3 py-1.5 text-[11px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-zinc-700 hover:text-white transition-all"
+                     >
+                       ⛶ Fullscreen
+                     </button>
+                  </div>
+                  <div className="relative aspect-video w-full rounded-2xl border border-white/5 bg-black shadow-2xl">
+                     <iframe
+                       id="vidsrc-iframe"
+                       src={playerUrl || ""}
+                       className="absolute inset-0 size-full border-0 rounded-2xl"
+                       allowFullScreen={true}
+                       allow="autoplay; fullscreen; picture-in-picture; encrypted-media; gyroscope; accelerometer"
+                       referrerPolicy="no-referrer"
+                     />
+                  </div>
+                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                     <p className="text-xs text-emerald-500/80 leading-relaxed font-medium">
+                        Note: VidSrc uses third-party servers. We recommend an <b>Ad-Blocker</b> for this backup source.
+                     </p>
+                  </div>
+               </div>
+            )}
         </div>
       </div>
     </section>
