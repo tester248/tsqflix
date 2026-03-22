@@ -38,6 +38,24 @@ app.get('/', (req, res) => {
     res.send('Showbox and Febbox API is working!');
 });
 
+app.get('/api/debug', (req, res) => {
+    res.json({
+        cookie_length: process.env.FEBBOX_UI_COOKIE ? process.env.FEBBOX_UI_COOKIE.length : 0,
+        cookie_value: process.env.FEBBOX_UI_COOKIE ? process.env.FEBBOX_UI_COOKIE.substring(0, 50) + "..." : "missing"
+    });
+});
+
+app.get('/api/debug2', async (req, res) => {
+    try {
+        const url = `https://www.febbox.com/console/video_quality_list?fid=2636650`;
+        const response = await fetch(url, { headers: { cookie: `ui=${process.env.FEBBOX_UI_COOKIE}`, 'x-requested-with': 'XMLHttpRequest', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', referer: `https://www.febbox.com/share/fNBTg8at` } });
+        const text = await response.text();
+        res.send(text);
+    } catch (e) {
+        res.status(500).send(e.message);
+    }
+});
+
 // Autocomplete endpoint
 app.get('/api/autocomplete', async (req, res) => {
     const { keyword, pagelimit } = req.query;

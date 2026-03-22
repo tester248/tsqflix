@@ -5,18 +5,18 @@ import { format } from "@/tmdb/utils"
 
 import { pad } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { MediaBackdrop } from "@/components/media/media-backdrop"
 import { MediaDetailView } from "@/components/media/media-detail-view"
 import { MediaRating } from "@/components/media/media-rating"
 import { TvEpisodeDetails } from "@/components/tv/tv-episode-details"
 import { TvEpisodeNavigation } from "@/components/tv/tv-episode-navigation"
 import { TvSeasonBreadcrumb } from "@/components/tv/tv-season-breadcrumb"
+import { ShowboxStreamPanel } from "@/components/showbox/showbox-stream-panel"
 
 interface DetailEpisodeProps {
   params: {
     id: string
-    season: number
-    episode: number
+    season: string
+    episode: string
   }
 }
 
@@ -27,13 +27,13 @@ export async function generateMetadata({ params }: DetailEpisodeProps) {
 
   const season = await tmdb.tvSeasons.details({
     id: params.id,
-    season: params.season,
+    season: Number(params.season),
   })
 
   const episode = await tmdb.tvEpisodes.details({
     id: params.id,
-    season: params.season,
-    episode: params.episode,
+    season: Number(params.season),
+    episode: Number(params.episode),
   })
 
   return {
@@ -42,8 +42,11 @@ export async function generateMetadata({ params }: DetailEpisodeProps) {
 }
 
 export default async function DetailEpisode({
-  params: { id, season, episode },
+  params: { id, season: seasonNum, episode: episodeNum },
 }: DetailEpisodeProps) {
+  const season = Number(seasonNum)
+  const episode = Number(episodeNum)
+
   const showDetails = await tmdb.tv.detail({
     id: id,
   })
@@ -66,15 +69,14 @@ export default async function DetailEpisode({
 
   return (
     <MediaDetailView.Root>
-      <div className="container mb-4">
-        <div className="relative aspect-video w-full">
-          <MediaBackdrop
-            image={episodeDetails.still_path}
-            size="original"
-            alt={episodeDetails.name}
-            priority
-          />
-        </div>
+      <div className="container mb-8">
+         <ShowboxStreamPanel 
+           title={showDetails.name} 
+           tmdbId={id} 
+           type="tv" 
+           season={season} 
+           episode={episode} 
+         />
       </div>
 
       <MediaDetailView.Hero>

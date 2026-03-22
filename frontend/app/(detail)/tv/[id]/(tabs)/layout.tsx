@@ -12,6 +12,9 @@ import { MediaPoster } from "@/components/media/media-poster"
 import { MediaRating } from "@/components/media/media-rating"
 import { MediaTrailerDialog } from "@/components/media/media-trailer-dialog"
 import { ScrollFixer } from "@/components/shared/scroll-fixer"
+import { cn } from "@/lib/utils"
+import { buttonVariants } from "@/components/ui/button"
+import { Play } from "lucide-react"
 
 interface DetailLayoutProps {
   params: {
@@ -94,14 +97,26 @@ export default async function DetailLayout({
             dangerouslySetInnerHTML={{ __html: format.content(overview) }}
           />
 
-          <MediaTrailerDialog videos={videos?.results} />
+          <div className="flex gap-4 items-center">
+            <Link
+              href={`${pages.tv.root.link}/${id}/seasons/1/episodes/1`}
+              className={cn(buttonVariants({ variant: "default" }), "gap-2")}
+            >
+              <Play className="size-4 fill-current" />
+              <span>Start Watching</span>
+            </Link>
+            <MediaTrailerDialog videos={videos?.results} />
+          </div>
         </div>
       </MediaDetailView.Hero>
 
       <MediaDetailView.Content>
-        <Tabs className="mt-8 lg:mt-12">
+        <Tabs className="mt-8 lg:mt-12" defaultValue="seasons">
           <div className="max-w-screen scrollbar-hidden -mx-8 overflow-x-scroll px-8 lg:m-0 lg:p-0">
             <TabsList>
+              <TabsLink href={`${pages.tv.root.link}/${id}/seasons`}>
+                Seasons
+              </TabsLink>
               <TabsLink href={`${pages.tv.root.link}/${id}`}>Overview</TabsLink>
               <TabsLink
                 className="gap-2"
@@ -109,14 +124,8 @@ export default async function DetailLayout({
               >
                 Credits
               </TabsLink>
-              <TabsLink href={`${pages.tv.root.link}/${id}/watch`}>
-                Watch
-              </TabsLink>
               <TabsLink href={`${pages.tv.root.link}/${id}/reviews`}>
                 Reviews
-              </TabsLink>
-              <TabsLink href={`${pages.tv.root.link}/${id}/seasons`}>
-                Seasons
               </TabsLink>
               <TabsLink href={`${pages.tv.root.link}/${id}/images`}>
                 Images

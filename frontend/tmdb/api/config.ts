@@ -1,8 +1,8 @@
 /**
  * Configuration for the TMDB API.
  *
- * Defines the base URL for all API requests, default headers including content type and authorization,
- * and default parameters such as the language setting.
+ * Defines the base URL for all API requests, default headers including content type,
+ * and default parameters such as the API key.
  */
 
 /**
@@ -13,21 +13,19 @@ const baseUrl: string = "https://api.themoviedb.org/3"
 
 /**
  * Default headers for API requests.
- * Includes the Content-Type and Authorization constructed using the TMDB_KEY environment variable.
  * @type {Record<string, string>}
  */
 const defaultHeaders: Record<string, string> = {
   "Content-Type": "application/json",
-  Authorization: `Bearer ${process.env.TMDB_KEY}`,
 }
 
 /**
  * Default parameters for API requests.
- * Currently, only includes the default language setting.
+ * Includes the v3 API key so it is appended to every request URL automatically.
  * @type {Record<string, string>}
  */
 const defaultParams: Record<string, string> = {
-  // language: "en-US",
+  api_key: process.env.TMDB_KEY || "",
 }
 
 /**

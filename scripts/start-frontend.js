@@ -15,7 +15,7 @@ if (!existing.includes("--dns-result-order")) {
   process.env.NODE_OPTIONS = `${existing} --dns-result-order=ipv4first`.trim()
 }
 
-const child = spawn("npm", ["--prefix", "frontend", "run", "dev"], {
+const child = spawn("npm", ["--prefix", "frontend", "run", "start"], {
   stdio: "inherit",
   env: process.env,
   shell: true,

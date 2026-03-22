@@ -72,8 +72,14 @@ class FebboxAPI {
 
         const htmlResponse = await this._fetchText(url, cookie);
 
+        let actualHtml = htmlResponse;
+        try {
+            const parsed = JSON.parse(htmlResponse);
+            actualHtml = parsed.html || parsed.data || htmlResponse;
+        } catch (e) {}
+
         // Parse HTML response and extract file qualities
-        const dom = new JSDOM(htmlResponse);
+        const dom = new JSDOM(actualHtml);
         const doc = dom.window.document;
 
         return this._extractFileQualities(doc);

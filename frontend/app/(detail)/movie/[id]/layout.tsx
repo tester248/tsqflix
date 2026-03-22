@@ -11,6 +11,7 @@ import { MediaDetailView } from "@/components/media/media-detail-view"
 import { MediaPoster } from "@/components/media/media-poster"
 import { MediaRating } from "@/components/media/media-rating"
 import { MediaTrailerDialog } from "@/components/media/media-trailer-dialog"
+import { MediaPlayDialog } from "@/components/media/media-play-dialog"
 import { ScrollFixer } from "@/components/shared/scroll-fixer"
 
 interface DetailLayoutProps {
@@ -97,7 +98,10 @@ export default async function DetailLayout({
             dangerouslySetInnerHTML={{ __html: format.content(overview) }}
           />
 
-          <MediaTrailerDialog videos={videos?.results} />
+          <div className="flex gap-4 items-center">
+            <MediaPlayDialog id={String(id)} title={title} type="movie" />
+            <MediaTrailerDialog videos={videos?.results} />
+          </div>
         </div>
       </MediaDetailView.Hero>
 
@@ -110,9 +114,6 @@ export default async function DetailLayout({
               </TabsLink>
               <TabsLink href={`${pages.movie.root.link}/${id}/credits`}>
                 Credits
-              </TabsLink>
-              <TabsLink href={`${pages.movie.root.link}/${id}/watch`}>
-                Watch
               </TabsLink>
               <TabsLink href={`${pages.movie.root.link}/${id}/reviews`}>
                 Reviews

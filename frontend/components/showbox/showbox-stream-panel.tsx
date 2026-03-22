@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, Play } from "lucide-react"
+import { AlertTriangle, ChevronLeft, Play, RotateCcw, Search, Share2, ShieldCheck, Zap } from "lucide-react"
 
-import { buttonVariants } from "@/components/ui/button"
 import { VideoPlayer } from "@/components/video/video-player"
+import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { useAppStore } from "@/store/use-app-store"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_TSQFLIX_API_URL?.replace(/\/$/, "") ?? ""
 
@@ -41,22 +43,28 @@ interface ShowboxStreamPanelProps {
   title: string
   tmdbId: string
   type: "movie" | "tv"
+  season?: number
+  episode?: number
 }
 
-export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, type }) => {
+type LoadingPhase = 'idle' | 'searching' | 'resolving' | 'fetching_files' | 'getting_links' | 'ready'
+
+export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, type, tmdbId, season, episode }) => {
   const apiBase = useMemo(() => API_BASE_URL, [])
   const searchType = type === "movie" ? "movie" : "tv"
+  const { addHistory } = useAppStore()
+
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('idle')
+  const [loadingProgress, setLoadingProgress] = useState(0)
 
   const [searchResults, setSearchResults] = useState<ShowboxResult[]>([])
   const [selectedResult, setSelectedResult] = useState<ShowboxResult | null>(null)
-  const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
 
   const [shareKey, setShareKey] = useState<string | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
 
   const [files, setFiles] = useState<FebboxFile[]>([])
-  const [filesLoading, setFilesLoading] = useState(false)
   const [filesError, setFilesError] = useState<string | null>(null)
   const [pathStack, setPathStack] = useState<BreadcrumbItem[]>([{ id: 0, label: "Root" }])
 
@@ -66,324 +74,341 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
   const [activeFile, setActiveFile] = useState<FebboxFile | null>(null)
   const [playerUrl, setPlayerUrl] = useState<string | null>(null)
   const [playerQualityTitle, setPlayerQualityTitle] = useState<string | null>(null)
+  const [sourceType, setSourceType] = useState<'febbox' | 'vidsrc'>('febbox')
 
   const currentParentId = pathStack[pathStack.length - 1]?.id ?? 0
 
-  useEffect(() => {
-    if (!apiBase || !title) return
-
-    const controller = new AbortController()
-    setIsSearching(true)
-    setSearchError(null)
-    fetch(`${apiBase}/api/search?type=${searchType}&title=${encodeURIComponent(title)}`, {
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Search failed: ${res.statusText}`)
-        return res.json()
-      })
-      .then((results: ShowboxResult[]) => {
-        if (!controller.signal.aborted) {
-          setSearchResults(results ?? [])
-          setSelectedResult(results?.[0] ?? null)
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setSearchError(err.message)
-          setSearchResults([])
-          setSelectedResult(null)
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsSearching(false)
-        }
-      })
-
-    return () => controller.abort()
-  }, [apiBase, searchType, title])
-
-  useEffect(() => {
-    if (!selectedResult || !apiBase) {
-      setShareKey(null)
+  const handleFileSelect = async (file: FebboxFile) => {
+    if (file.is_dir) {
+      setPathStack(stack => [...stack, { id: file.fid, label: file.file_name }])
       return
     }
 
-    const controller = new AbortController()
-    setShareError(null)
-    setShareKey(null)
-    setFiles([])
-    setPathStack([{ id: 0, label: "Root" }])
-    setActiveFile(null)
-    setQualities([])
-    setPlayerUrl(null)
-    setPlayerQualityTitle(null)
-
-    const requestType = selectedResult.box_type || (type === "movie" ? 1 : 2)
-
-    fetch(`${apiBase}/api/febbox/id?id=${selectedResult.id}&type=${requestType}`, {
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to resolve Febbox share: ${res.statusText}`)
-        return res.json()
-      })
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setShareKey(data?.febBoxId ?? null)
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setShareError(err.message)
-        }
-      })
-
-    return () => controller.abort()
-  }, [apiBase, selectedResult, type])
-
-  useEffect(() => {
-    if (!shareKey || !apiBase) return
-
-    const controller = new AbortController()
-    setFilesError(null)
-    setFilesLoading(true)
-    fetch(`${apiBase}/api/febbox/files?shareKey=${encodeURIComponent(shareKey)}&parent_id=${currentParentId}`, {
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load Febbox files: ${res.statusText}`)
-        return res.json()
-      })
-      .then((data: FebboxFile[]) => {
-        if (!controller.signal.aborted) {
-          setFiles(data ?? [])
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setFilesError(err.message)
-          setFiles([])
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setFilesLoading(false)
-        }
-      })
-
-    return () => controller.abort()
-  }, [apiBase, shareKey, currentParentId])
-
-  const handleFolderClick = (file: FebboxFile) => {
-    if (!file.is_dir) return
-    setPathStack((stack) => [...stack, { id: file.fid, label: file.file_name }])
-    setQualities([])
-    setPlayerUrl(null)
-    setPlayerQualityTitle(null)
-    setActiveFile(null)
-  }
-
-  const handleBack = () => {
-    if (pathStack.length <= 1) return
-    setPathStack((stack) => stack.slice(0, -1))
-    setQualities([])
-    setPlayerUrl(null)
-    setPlayerQualityTitle(null)
-    setActiveFile(null)
-  }
-
-  const handleFileSelection = async (file: FebboxFile) => {
-    if (!shareKey || !apiBase) return
     setActiveFile(file)
-    setQualities([])
-    setPlayerUrl(null)
-    setPlayerQualityTitle(null)
-    setQualitiesError(null)
     setQualitiesLoading(true)
+    setQualitiesError(null)
 
     try {
-      const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${encodeURIComponent(shareKey)}&fid=${file.fid}`)
-      if (!res.ok) throw new Error(`Failed to load link data: ${res.statusText}`)
+      const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${encodeURIComponent(shareKey!)}&fid=${file.fid}`)
       const data: FebboxQuality[] = await res.json()
       setQualities(data ?? [])
-      if (data?.[0]?.url) {
-        setPlayerUrl(data[0].url)
-        setPlayerQualityTitle(data[0].quality ?? data[0].name ?? file.file_name)
+      
+      const hlsStream = data.find(q => q.url?.includes('.m3u8'))
+      const bestStream = hlsStream || data[0]
+      
+      if (bestStream?.url) {
+        setPlayerUrl(bestStream.url)
+        setPlayerQualityTitle(`${file.file_name} - ${bestStream.quality || bestStream.name}`)
+        setSourceType('febbox')
+        
+        addHistory({
+          id: tmdbId,
+          title: title,
+          poster: "", 
+          type: type,
+          timestamp: 0,
+          duration: 0
+        })
       }
     } catch (err) {
-      setQualitiesError(err instanceof Error ? err.message : "Failed to load qualities")
+      setQualitiesError("Failed to load playback links.")
     } finally {
       setQualitiesLoading(false)
     }
   }
 
-  const handleQualitySelect = (quality: FebboxQuality) => {
-    if (!quality.url) return
-    setPlayerUrl(quality.url)
-    setPlayerQualityTitle(quality.quality ?? quality.name ?? activeFile?.file_name ?? title)
+  // 1. Search Logic
+  useEffect(() => {
+    if (!apiBase || !title) return
+    const controller = new AbortController()
+    setLoadingPhase('searching')
+    setLoadingProgress(15)
+    
+    fetch(`${apiBase}/api/search?type=${searchType}&title=${encodeURIComponent(title)}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(results => {
+        if (!controller.signal.aborted) {
+          setSearchResults(results ?? [])
+          setSelectedResult(results?.[0] ?? null)
+          setLoadingProgress(35)
+        }
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) setSearchError(err.message)
+      })
+    return () => controller.abort()
+  }, [apiBase, searchType, title])
+
+  // 2. Resolve Share ID logic
+  useEffect(() => {
+    if (!selectedResult || !apiBase) return
+    const controller = new AbortController()
+    setLoadingPhase('resolving')
+    setLoadingProgress(50)
+    
+    const requestType = selectedResult.box_type || (type === "movie" ? 1 : 2)
+    fetch(`${apiBase}/api/febbox/id?id=${selectedResult.id}&type=${requestType}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (!controller.signal.aborted) {
+          setShareKey(data?.febBoxId ?? null)
+          setLoadingProgress(70)
+        }
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) {
+          setShareError(err.message)
+          setLoadingPhase('ready')
+        }
+      })
+    return () => controller.abort()
+  }, [apiBase, selectedResult, type])
+
+  // 3. Fetch Files logic
+  useEffect(() => {
+    if (!shareKey || !apiBase) return
+    const controller = new AbortController()
+    setLoadingPhase('fetching_files')
+    setLoadingProgress(85)
+
+    fetch(`${apiBase}/api/febbox/files?shareKey=${encodeURIComponent(shareKey)}&parent_id=${currentParentId}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (!controller.signal.aborted) {
+          setFiles(data ?? [])
+          setLoadingPhase('ready')
+          setLoadingProgress(100)
+          
+          if (currentParentId === 0 && data?.length > 0) {
+            if (type === "tv" && season) {
+              const seasonFolder = data.find((f: any) => f.is_dir && (
+                f.file_name.toLowerCase().includes(`season ${season}`) || 
+                f.file_name.toLowerCase().includes(`s${String(season).padStart(2, '0')}`)
+              ))
+              if (seasonFolder) {
+                handleFileSelect(seasonFolder)
+                return
+              }
+            }
+
+            const epPattern = episode ? `(s${String(season).padStart(2, '0')}e${String(episode).padStart(2, '0')}|${season}x${String(episode).padStart(2, '0')}|e${String(episode).padStart(2, '0')}|^${episode}\\s|\\s${episode}\\.|\\(${episode}\\))` : ""
+            const episodeRegex = episode ? new RegExp(epPattern, 'i') : null
+            
+            const targetFile = data.find((f: any) => {
+              const isVideo = f.file_name.match(/\.(mp4|mkv|avi|webm|m3u8)$/i)
+              if (!isVideo) return false
+              if (!episodeRegex) return true 
+              return episodeRegex.test(f.file_name)
+            }) || data.find((f: any) => f.file_name.match(/\.(mp4|mkv|avi|webm|m3u8)$/i)) || data[0]
+
+            if (targetFile) handleFileSelect(targetFile)
+          }
+        }
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) setFilesError(err.message)
+      })
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBase, shareKey, currentParentId, season, episode, type])
+
+  const handleVidSrcSelect = () => {
+    setSourceType('vidsrc')
+    setPlayerUrl(`https://vidsrc.me/embed/${type}?tmdb=${tmdbId}`)
+    setPlayerQualityTitle(`${title} - HD Backup`)
   }
 
-  if (!apiBase) {
-    return (
-      <section className="rounded-2xl border border-dashed border-slate-300 p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Set NEXT_PUBLIC_TSQFLIX_API_URL in your environment to enable the Showbox/Febbox panel.
-        </p>
-      </section>
-    )
+  const statusMap = {
+    idle: "Waiting...",
+    searching: `Searching for "${title}"...`,
+    resolving: "Bypassing Cloudflare protection...",
+    fetching_files: "Accessing media library...",
+    getting_links: "Extracting high-speed links...",
+    ready: "Ready for playback"
   }
 
   return (
-    <section className="space-y-6 rounded-2xl border border-border bg-background/70 p-6">
-      <div className="flex items-baseline justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Febbox Streams
-          </p>
-          <h3 className="text-2xl font-semibold">Play {title}</h3>
+    <section className="space-y-6 rounded-3xl border bg-zinc-950/50 p-6 backdrop-blur-xl shadow-2xl overflow-hidden">
+      {loadingPhase !== 'ready' && (
+        <div className="space-y-3 py-4">
+          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-500">
+             <div className="flex items-center gap-2">
+                <RotateCcw className="size-3 animate-spin text-rose-500" />
+                <span>{statusMap[loadingPhase]}</span>
+             </div>
+             <span>{loadingProgress}%</span>
+          </div>
+          <Progress value={loadingProgress} className="h-1.5" />
         </div>
-        <span className="text-xs font-medium text-muted-foreground">{type}</span>
-      </div>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr,1.2fr]">
-        <div className="space-y-4 rounded-2xl border bg-card/50 p-4">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Showbox search</p>
-            <p className="text-xs text-muted-foreground">
-              searching for {title} in {type}
-            </p>
-          </div>
-
-          {isSearching && <p className="text-sm text-muted-foreground">Looking up Showbox results…</p>}
-          {searchError && <p className="text-sm text-destructive">{searchError}</p>}
-
-          <div className="grid gap-2">
-            {searchResults.slice(0, 5).map((result) => (
-              <button
-                key={result.id}
-                className={cn(
-                  buttonVariants({ variant: selectedResult?.id === result.id ? "default" : "outline" }),
-                  "justify-between"
-                )}
-                onClick={() => setSelectedResult(result)}
-                type="button"
-              >
-                <span className="text-sm font-medium">{result.title}</span>
-                <span className="text-xs text-muted-foreground">{result.year ?? "n/a"}</span>
-              </button>
-            ))}
-          </div>
-
-          {selectedResult && (
-            <div className="space-y-1 rounded-xl border bg-background px-3 py-2 text-sm text-muted-foreground">
-              <p className="text-sm font-medium text-foreground">{selectedResult.title}</p>
-              {selectedResult.description && <p>{selectedResult.description}</p>}
-              <p>Showbox ID: {selectedResult.id}</p>
-            </div>
-          )}
-
-          {shareKey && (
-            <p className="text-sm text-muted-foreground">
-              Febbox share: <span className="font-mono text-foreground">{shareKey}</span>
-            </p>
-          )}
-          {shareError && <p className="text-sm text-destructive">{shareError}</p>}
-        </div>
-
-        <div className="space-y-4 rounded-2xl border bg-card/60 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Files</p>
-              <p className="text-xs text-muted-foreground">
-                {pathStack.map((crumb) => crumb.label).join(" / ")}
-              </p>
-            </div>
-            <button
-              className={cn(buttonVariants({ variant: "ghost" }))}
-              disabled={pathStack.length <= 1}
-              onClick={handleBack}
-              type="button"
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" /> Back
-            </button>
-          </div>
-
-          {filesLoading && <p className="text-sm text-muted-foreground">Loading files…</p>}
-          {filesError && <p className="text-sm text-destructive">{filesError}</p>}
-
-          <div className="space-y-2">
-            {files.map((file) => (
-              <div
-                key={file.fid}
-                className="flex items-center justify-between rounded-xl border bg-background px-3 py-2 text-sm"
-              >
-                <div>
-                  <p className="font-medium">{file.file_name}</p>
-                  <p className="text-xs text-muted-foreground">{file.file_size}</p>
-                </div>
-                {file.is_dir ? (
-                  <button
-                    type="button"
-                    className={cn(buttonVariants({ variant: "outline" }))}
-                    onClick={() => handleFolderClick(file)}
-                  >
-                    Open
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={cn(buttonVariants({ variant: "ghost" }))}
-                    onClick={() => handleFileSelection(file)}
-                  >
-                    <Play className="mr-1 h-4 w-4" /> Select
-                  </button>
-                )}
+      <div className="grid gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-4 space-y-6">
+           <div className="space-y-4">
+              <div className="flex items-center gap-2 text-zinc-400">
+                 <Search className="size-4" />
+                 <h3 className="text-sm font-bold uppercase tracking-widest">Sources</h3>
               </div>
-            ))}
-            {!filesLoading && !files.length && shareKey && (
-              <p className="text-sm text-muted-foreground">No files found in this folder.</p>
-            )}
-          </div>
+              
+              <div className="space-y-2">
+                 <button 
+                   onClick={() => setSourceType('febbox')}
+                   className={cn(
+                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
+                     sourceType === 'febbox' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
+                   )}
+                 >
+                    <div className="flex items-center gap-3">
+                       <ShieldCheck className="size-5" />
+                       <span className="font-semibold text-xs">Febbox (Premium)</span>
+                    </div>
+                    {loadingPhase !== 'ready' && <Zap className="size-4 animate-pulse text-zinc-500" />}
+                 </button>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Qualities</p>
-              {qualitiesLoading && <span className="text-xs text-muted-foreground">Fetching links...</span>}
-            </div>
+                 <button 
+                   onClick={handleVidSrcSelect}
+                   className={cn(
+                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
+                     sourceType === 'vidsrc' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
+                   )}
+                 >
+                    <div className="flex items-center gap-3">
+                       <Share2 className="size-5" />
+                       <span className="font-semibold text-xs">VidSrc (Backup)</span>
+                    </div>
+                 </button>
+              </div>
+           </div>
 
-            {qualitiesError && <p className="text-sm text-destructive">{qualitiesError}</p>}
+           {searchResults.length > 1 && (
+              <div className="space-y-3 pt-4 border-t border-white/5">
+                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
+                 <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
+                    {searchResults.map(res => (
+                       <button 
+                         key={res.id}
+                         onClick={() => setSelectedResult(res)}
+                         className={cn(
+                           "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
+                           selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                         )}
+                       >
+                          {res.title} ({res.year})
+                       </button>
+                    ))}
+                 </div>
+              </div>
+           )}
+        </div>
 
-            <div className="flex flex-wrap gap-2">
-              {qualities.map((quality) => {
-                const label = quality.quality || quality.name || "link"
-                const isActive = quality.url === playerUrl
-                return (
-                  <button
-                    key={`${quality.url}-${label}`}
-                    type="button"
-                    className={cn(buttonVariants({ variant: isActive ? "default" : "outline" }))}
-                    onClick={() => handleQualitySelect(quality)}
-                    disabled={!quality.url}
-                  >
-                    {label}
-                    {quality.size && <span className="ml-2 text-[11px] text-muted-foreground">{quality.size}</span>}
-                  </button>
-                )
-              })}
-            </div>
-            {!qualitiesLoading && !qualities.length && activeFile && (
-              <p className="text-sm text-muted-foreground">No quality links available for this file.</p>
-            )}
-          </div>
+        <div className="lg:col-span-8 space-y-6">
+           {sourceType === 'febbox' ? (
+              <>
+                {playerUrl ? (
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-2">
+                         <div className="flex items-center gap-2">
+                            <Play className="size-4 text-rose-500 fill-rose-500" />
+                            <span className="text-xs font-bold text-zinc-200 uppercase tracking-widest leading-none">STREAMING PLAYER</span>
+                         </div>
+                      </div>
+                      <VideoPlayer 
+                        url={playerUrl} 
+                        title={playerQualityTitle || ""} 
+                        qualities={qualities.map(q => ({ label: String(q.quality || q.name || "HD"), url: q.url }))}
+                        onQualityChange={(url) => setPlayerUrl(url)}
+                      />
+                   </div>
+                ) : (
+                   <div className="aspect-video w-full rounded-2xl border border-white/5 bg-zinc-900/50 flex flex-col items-center justify-center gap-4 text-zinc-500">
+                      {loadingPhase === 'ready' ? (
+                         <>
+                            <AlertTriangle className="size-12 opacity-20" />
+                            <p className="text-sm font-medium">Select a file below to start streaming</p>
+                         </>
+                      ) : (
+                         <>
+                            <div className="size-12 rounded-full border-t-2 border-rose-500 animate-spin" />
+                            <p className="text-sm font-bold animate-pulse">{statusMap[loadingPhase]}</p>
+                         </>
+                      )}
+                   </div>
+                )}
 
-          {playerUrl && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Player</p>
-              <VideoPlayer url={playerUrl} title={playerQualityTitle ?? activeFile?.file_name} />
-            </div>
-          )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                   <div className="space-y-3 rounded-2xl bg-zinc-900/30 p-4 border border-white/5">
+                      <div className="flex items-center justify-between">
+                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Files</p>
+                         {pathStack.length > 1 && (
+                            <button onClick={() => setPathStack(s => s.slice(0, -1))} className="text-[10px] flex items-center gap-1 text-rose-500 hover:underline">
+                               <ChevronLeft className="size-3" /> Back
+                            </button>
+                         )}
+                      </div>
+                      <div className="space-y-1 max-h-64 overflow-y-auto pr-2 scrollbar-thin">
+                         {loadingPhase !== 'ready' ? [1,2,3].map(i => <Skeleton key={i} className="h-10 w-full mb-1" />) : 
+                           files.map(f => (
+                             <button
+                               key={f.fid}
+                               onClick={() => handleFileSelect(f)}
+                               className={cn(
+                                 "w-full text-left px-3 py-2 rounded-lg text-[11px] flex justify-between items-center transition-colors",
+                                 activeFile?.fid === f.fid ? "bg-white/10 text-white font-medium" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                               )}
+                             >
+                                <span className="line-clamp-1 flex-1">{f.file_name}</span>
+                                {f.is_dir ? <ChevronLeft className="size-3 rotate-180 opacity-50 ml-2" /> : <Play className="size-2.5 ml-2 opacity-50" />}
+                             </button>
+                           ))
+                         }
+                      </div>
+                   </div>
+
+                   <div className="space-y-3 rounded-2xl bg-zinc-900/30 p-4 border border-white/5">
+                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Resolutions</p>
+                      <div className="flex flex-wrap gap-2">
+                         {qualitiesLoading ? [1,2].map(i => <Skeleton key={i} className="h-8 w-20" />) : 
+                           qualities.map(q => (
+                             <button
+                               key={q.url}
+                               onClick={() => setPlayerUrl(q.url)}
+                               className={cn(
+                                 "px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all",
+                                 playerUrl === q.url ? "bg-rose-500 border-rose-500 text-white shadow-lg" : "bg-zinc-800 border-white/5 text-zinc-400 hover:bg-zinc-700 hover:text-white"
+                               )}
+                             >
+                                {q.quality || q.name}
+                             </button>
+                           ))
+                         }
+                         {!qualities.length && !qualitiesLoading && activeFile && <p className="text-[10px] text-zinc-600">No alternate links</p>}
+                      </div>
+                   </div>
+                </div>
+              </>
+           ) : (
+              <div className="space-y-4">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <Zap className="size-4 text-emerald-500 fill-emerald-500" />
+                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">Backup Server Active</span>
+                    </div>
+                 </div>
+                 <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/5 bg-black shadow-2xl">
+                    <iframe 
+                      src={playerUrl || ""} 
+                      className="size-full border-0" 
+                      allowFullScreen 
+                      allow="autoplay; fullscreen"
+                    />
+                 </div>
+                 <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                    <p className="text-xs text-emerald-500/80 leading-relaxed font-medium">
+                       Note: VidSrc uses third-party servers. We recommend an <b>Ad-Blocker</b> for this backup source.
+                    </p>
+                 </div>
+              </div>
+           )}
         </div>
       </div>
     </section>

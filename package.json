@@ -4,7 +4,12 @@
   "scripts": {
     "backend": "dotenv -e .env -- npm --prefix backend run start",
     "frontend": "node scripts/run-frontend.js",
-    "dev": "concurrently --names backend,frontend --kill-others-on-fail \"npm:backend\" \"npm:frontend\""
+    "frontend:build": "dotenv -e .env -- npm --prefix frontend run build",
+    "frontend:start": "node scripts/start-frontend.js",
+    "dev": "concurrently --names backend,frontend --kill-others-on-fail \"npm:backend\" \"npm:frontend\"",
+    "clean": "if exist frontend\\.next rmdir /s /q frontend\\.next",
+    "build": "npm run clean && npm run frontend:build",
+    "start": "dotenv -e .env -- concurrently --names backend,frontend --kill-others-on-fail \"npm:backend\" \"npm:frontend:start\""
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

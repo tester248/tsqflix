@@ -1,43 +1,66 @@
-# tsqflix
+# TSQFLIX 🚀
 
-This workspace brings together two open-source codebases so we can build a full streaming experience:
+TSQFLIX is a high-performance, resilient streaming platform that bridges the gap between **TMDB** media discovery and **Febbox/Showbox** premium storage. This workspace integrates a robust Node.js backend with a cutting-edge Next.js frontend to deliver a seamless, cinema-grade experience.
 
-- `backend/` – the Showbox + Febbox API integration originally cloned from [badwinton/show_feb_box_api](https://github.com/badwinton/show_feb_box_api);
-- `frontend/` – the TMDB-powered Next.js frontend forked from [oktay/movies](https://github.com/oktay/movies).
+## 🌟 Key Features
 
-## Getting started
+### 💎 Premium Playback Experience
+- **ACES Tone Mapping**: Synthetic HDR-to-SDR tone mapping for HDR10 and Dolby Vision content. Say goodbye to washed-out colors on standard displays.
+- **Resilient Streaming**: Upgraded HLS.js engine with aggressive buffering and auto-recovery for zero-interruption playback.
+- **Dynamic Quality Selection**: Seamlessly switch between resolutions with instant keyframe seeking.
 
-1. Copy your Febbox UI cookie into `./.env` (the backend reads `FEBBOX_UI_COOKIE`).
-2. From the workspace root, install the orchestrator helper that can run both services:
+### 🛡️ Unmatched Resilience
+- **Infinite Retry Engine**: TMDB requests now feature a 50-attempt auto-retry system with intelligent backoff.
+- **Disaster Recovery UI**: A beautiful, custom connection-interrupted dashboard that automatically recovers your session when the network returns.
+- **Failover Sources**: Integrated backup server support (VidSrc) for 100% uptime.
 
-	```bash
-	npm install
-	```
-3. Install the backend and frontend dependencies once (you can rerun these if you ever delete `node_modules`):
+### 📺 Advanced Media Navigation
+- **Series-First Navigation**: Optimized TV Show flow that lands users directly in the Seasons tab for intuitive browsing.
+- **"Start Watching" Magic**: Intelligent buttons that track your progress and link directly to the correct episode.
+- **Personal Library**: Persistent "Continue Watching" and "My List" features stored locally in your browser.
 
-	```bash
-	cd backend && npm install
-	cd ../frontend && npm install
-	```
-4. Add your TMDB key and the backend URL to the same root `./.env` file used by the backend. The orchestrator scripts load this file so both services get the same values (no need for `frontend/.env.local`).
+### ⚡ Performance Optimized
+- **IPv4-First Resolution**: Resolved common Node.js/Windows DNS hanging issues for "instant-on" API response.
+- **Smart Caching**: Local TMDB file-based caching to reduce API overhead and latency.
+- **Clean Build System**: Automated `.next` cache purging to ensure every deployment is perfect.
 
-	```bash
-	TMDB_KEY=your-api-key
-	NEXT_PUBLIC_TSQFLIX_API_URL=http://localhost:3000
-	```
-5. Run the combined dev script from the workspace root:
+## 🛠️ Getting Started
 
-	```bash
-	npm run dev
-	```
+### 1. Prerequisites
+- **Febbox**: You must have a valid Febbox account.
+- **TMDB API Key**: Obtain one from [themoviedb.org](https://api.themoviedb.org).
 
-	The root script starts the backend on port `3000` and the Next.js frontend on `FRONTEND_PORT` (defaults to `3001`). The two services share the same `.env`, which prevents conflicts and keeps the watch tab connected to the Showbox/F Febbox API on `NEXT_PUBLIC_TSQFLIX_API_URL`.
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+TMDB_KEY=your_tmdb_api_key
+NEXT_PUBLIC_TSQFLIX_API_URL=http://localhost:3000
+FEBBOX_UI_COOKIE=your_febbox_cookie
+```
 
-	Visit [http://localhost:3001](http://localhost:3001) to view the frontend while the backend remains on port 3000.
+### 3. Installation
+From the workspace root:
+```bash
+# Install orchestrator helpers
+npm install
 
-The frontend can then be wired to call the backend endpoints (search, movie/show details, Febbox files/links) so the shared TMDB + Febbox data powers the streaming UI.
+# Install service dependencies
+cd backend && npm install
+cd ../frontend && npm install
+```
 
-## Credits
+### 4. Development & Production
+```bash
+# Start both services in Dev Mode
+npm run dev
 
-- Showbox/Febbox integration: [badwinton/show_feb_box_api](https://github.com/badwinton/show_feb_box_api)
-- TMDB frontend: [oktay/movies](https://github.com/oktay/movies)
+# Professional Production Build & Start
+npm run build && npm start
+```
+
+## 🏗️ Architecture
+- **`/backend`**: Express.js proxy for Showbox/Febbox APIs.
+- **`/frontend`**: Next.js 14 (App Router) with Tailwind CSS, ArtPlayer, and TanStack Query.
+
+---
+*Built with ❤️ for the ultimate streaming experience.*

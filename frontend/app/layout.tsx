@@ -1,7 +1,6 @@
 import "@/styles/globals.css"
 import { Metadata } from "next"
 import { siteConfig } from "@/config"
-import { GoogleAnalytics } from "@next/third-parties/google"
 import { GeistSans } from "geist/font/sans"
 import HolyLoader from "holy-loader"
 
@@ -13,6 +12,7 @@ import { GridBg } from "@/components/shared/grid-bg"
 import { ScrollTop } from "@/components/shared/scroll-top"
 import { TailwindIndicator } from "@/components/shared/tailwind-indicator"
 import { ThemeProvider } from "@/components/shared/theme-provider"
+import { QueryProvider } from "@/providers/query-provider"
 
 export const metadata: Metadata = {
   title: {
@@ -38,24 +38,25 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
-          GeistSans.variable
+          GeistSans.className
         )}
       >
         <HolyLoader color="#ccc" />
-        <ThemeProvider attribute="class" defaultTheme="dark">
-          <div
-            className="relative flex min-h-screen flex-col bg-background"
-            vaul-drawer-wrapper=""
-          >
-            <GridBg />
-            <SiteHeader />
-            <div className="relative flex-1 py-4">{children}</div>
-            <SiteFooter />
-          </div>
-          <TailwindIndicator />
-          <ScrollTop />
-        </ThemeProvider>
-        <GoogleAnalytics gaId={process.env.GA_ID!} />
+        <QueryProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark">
+            <div
+              className="relative flex min-h-screen flex-col bg-background"
+              vaul-drawer-wrapper=""
+            >
+              <GridBg />
+              <SiteHeader />
+              <div className="relative flex-1 py-4">{children}</div>
+              <SiteFooter />
+            </div>
+            <TailwindIndicator />
+            <ScrollTop />
+          </ThemeProvider>
+        </QueryProvider>
         <Toaster />
       </body>
     </html>

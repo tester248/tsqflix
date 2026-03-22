@@ -103,9 +103,60 @@ class ShowboxAPI {
     }
 
     async getFebBoxId(id, type) {
-        const response = await fetch(`https://www.showbox.media/index/share_link?id=${id}&type=${type}`);
-        const data = await response.json();
-        return data?.data?.link?.split('/').pop();
+        // Use the encrypted API to get the share link (avoids Cloudflare on showbox.media)
+        const module = type == 1 ? 'Movie_s498Fdownload' : 'TV_sdownload';
+        const params = type == 1 ? { mid: id } : { tid: id };
+        try {
+            const data = await this.request(module, params);
+            if (data && typeof data.data === 'object' && data.data.link) {
+                return data.data.link.split('/').pop();
+            }
+            console.log("Attempting corsproxy for ID", id);
+            // Attempt 1: Direct JSON approach via Free Public CORS proxy that is trusted by Cloudflare
+            try {
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(`https://www.showbox.media/index/share_link?id=${id}&type=${type}`)}`;
+                const response = await fetch(proxyUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+                        'Origin': 'http://localhost:3000',
+                        'Accept': 'application/json, text/html, */*'
+                    }
+                });
+                const text = await response.text();
+                
+                try {
+                    const json = JSON.parse(text);
+                    if (json && json.data && json.data.link) {
+                        return json.data.link.split('/').pop();
+                    }
+                } catch (e) {
+                    // Not JSON, might be HTML
+                    const match = text.match(/window\.location\.href\s*=\s*'([^']+)'/);
+                    if (match) {
+                        return match[1].split('/').pop();
+                    }
+                    const match2 = text.match(/share\/([a-zA-Z0-9_-]+)/);
+                    if (match2) {
+                        return match2[1];
+                    }
+                }
+            } catch (e) {
+                console.error("Proxy fetch failed:", e.message);
+            }
+
+            // Fallback: Original direct approach (which often gets blocked by Cloudflare on Vercel)
+            const fallbackResponse = await fetch(`https://www.showbox.media/index/share_link?id=${id}&type=${type}`);
+            const text = await fallbackResponse.text();
+
+            const match = text.match(/window\.location\.href\s*=\s*'([^']+)'/);
+            if (match) {
+                return match[1].split('/').pop();
+            }
+
+            return null;
+        } catch {
+            return null;
+        }
     }
 
     async getAutocomplete(keyword , pagelimit = 5) {
