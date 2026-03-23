@@ -45,14 +45,26 @@ interface ShowboxStreamPanelProps {
   type: "movie" | "tv"
   season?: number
   episode?: number
+  poster?: string
+  episodeTitle?: string
 }
 
 type LoadingPhase = 'idle' | 'searching' | 'resolving' | 'fetching_files' | 'getting_links' | 'ready'
 
-export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, type, tmdbId, season, episode }) => {
+export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ 
+  title, type, tmdbId, season, episode, poster = "", episodeTitle = "" 
+}) => {
   const apiBase = useMemo(() => API_BASE_URL, [])
   const searchType = type === "movie" ? "movie" : "tv"
-  const { addHistory } = useAppStore()
+  const { history, addHistory } = useAppStore()
+  
+  // Find previous watch time for this specific item
+  const initialStartTime = useMemo(() => {
+    const entry = history.find(h => 
+      h.id === tmdbId && h.season === season && h.episode === episode
+    );
+    return entry?.timestamp ?? 0;
+  }, [history, tmdbId, season, episode]);
 
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('idle')
   const [loadingProgress, setLoadingProgress] = useState(0)
@@ -105,10 +117,13 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
         addHistory({
           id: tmdbId,
           title: title,
-          poster: "", 
+          poster: poster, 
           type: type,
-          timestamp: 0,
-          duration: 0
+          timestamp: initialStartTime,
+          duration: 0,
+          season,
+          episode,
+          episodeTitle
         })
       }
     } catch (err) {
@@ -264,8 +279,25 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
                       <VideoPlayer 
                         url={playerUrl} 
                         title={playerQualityTitle || ""} 
+                        poster={poster}
+                        startTime={initialStartTime}
                         qualities={qualities.map(q => ({ label: String(q.quality || q.name || "HD"), url: q.url }))}
                         onQualityChange={(url) => setPlayerUrl(url)}
+                        onTimeUpdate={(time, duration) => {
+                          // Throttled persistence: save to history every 10 seconds 
+                          // ensuring we don't spam the store, but keep accurate progress
+                          addHistory({
+                            id: tmdbId,
+                            title: title,
+                            poster,
+                            type: type,
+                            timestamp: time,
+                            duration: duration,
+                            season,
+                            episode,
+                            episodeTitle
+                          });
+                        }}
                       />
                    </div>
                 ) : (

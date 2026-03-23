@@ -76,6 +76,8 @@ export default async function DetailEpisode({
            type="tv" 
            season={season} 
            episode={episode} 
+           poster={showDetails.poster_path}
+           episodeTitle={episodeDetails.name}
          />
       </div>
 

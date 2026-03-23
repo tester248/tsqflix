@@ -27,6 +27,8 @@ interface VideoPlayerProps {
   poster?: string
   qualities?: { label: string; url: string }[]
   onQualityChange?: (url: string) => void
+  startTime?: number
+  onTimeUpdate?: (time: number, duration: number) => void
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -35,6 +37,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   poster,
   qualities = [],
   onQualityChange,
+  startTime = 0,
+  onTimeUpdate,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const artRef = useRef<any>(null)
@@ -186,6 +190,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (onQualityChange) {
       art.on("video:url", (u: string) => onQualityChange(u))
     }
+
+    if (onTimeUpdate) {
+      art.on("video:timeupdate", () => {
+        onTimeUpdate(art.currentTime, art.duration)
+      })
+    }
+
+    art.on("ready", () => {
+      if (startTime > 0) {
+        art.currentTime = startTime
+      }
+    })
 
     artRef.current = art
 

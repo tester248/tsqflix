@@ -11,6 +11,9 @@ export interface WatchItem {
   timestamp: number;
   duration: number;
   lastUpdated: number;
+  season?: number;
+  episode?: number;
+  episodeTitle?: string;
 }
 
 export interface BookmarkItem {
@@ -41,12 +44,18 @@ export const useAppStore = create<AppState>()(
 
       addHistory: (item) => {
         set((state) => {
-          const filtered = state.history.filter((h) => h.id !== item.id);
+          // Unique key for history: TMDB ID + Season + Episode
+          const filtered = state.history.filter((h) => {
+            const isSameShow = h.id === item.id;
+            const isSameEpisode = h.season === item.season && h.episode === item.episode;
+            return !(isSameShow && isSameEpisode);
+          });
+          
           return {
             history: [
               { ...item, lastUpdated: Date.now() },
               ...filtered,
-            ].slice(0, 50), // Keep last 50
+            ].slice(0, 100), // Keep last 100
           };
         });
       },

@@ -4,6 +4,12 @@ import { useEffect, useState } from "react"
 import { useAppStore } from "@/store/use-app-store"
 import { TrendCarousel } from "@/components/trend/trend-carousel"
 import { History } from "lucide-react"
+import { ContinueWatchingCard } from "./continue-watching-card"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel"
 
 export const ContinueWatchingSection = () => {
     const { history } = useAppStore()
@@ -15,24 +21,28 @@ export const ContinueWatchingSection = () => {
 
     if (!mounted || !history || history.length === 0) return null
 
-    // Map history to the format TrendCarousel expects
-    const carouselItems = history.map(item => ({
-        id: parseInt(item.id),
-        title: item.title,
-        poster_path: item.poster,
-        media_type: item.type,
-        release_date: "", // Not needed for carousel but type requires it
-        vote_average: 0
-    }))
-
     return (
-        <TrendCarousel
-            type="movie" // This acts as a generic type for the carousel logic
-            title="Continue Watching"
-            description="Jump back into your recently watched titles."
-            icon={<History className="size-6 text-rose-500" />}
-            link="/library"
-            items={carouselItems as any}
-        />
+        <section className="space-y-6">
+            <div className="flex items-center gap-3">
+                <History className="size-6 text-rose-500 fill-rose-500/20" />
+                <div className="space-y-0.5">
+                    <h2 className="text-xl font-bold tracking-tight">Continue Watching</h2>
+                    <p className="text-sm text-zinc-500">Pick up exactly where you left off.</p>
+                </div>
+            </div>
+
+            <Carousel opts={{ dragFree: true, align: "start" }} className="w-full">
+                <CarouselContent className="-ml-4">
+                    {history.map((item, idx) => (
+                        <CarouselItem 
+                            key={`${item.id}-${item.season}-${item.episode}-${idx}`} 
+                            className="pl-4 basis-1/2 md:basis-1/3 lg:basis-1/4 xl:basis-1/5"
+                        >
+                            <ContinueWatchingCard item={item} />
+                        </CarouselItem>
+                    ))}
+                </CarouselContent>
+            </Carousel>
+        </section>
     )
 }
