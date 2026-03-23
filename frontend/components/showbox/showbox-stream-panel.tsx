@@ -56,6 +56,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
 
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('idle')
   const [loadingProgress, setLoadingProgress] = useState(0)
+  const [hasAutoSelected, setHasAutoSelected] = useState(false)
 
   const [searchResults, setSearchResults] = useState<ShowboxResult[]>([])
   const [selectedResult, setSelectedResult] = useState<ShowboxResult | null>(null)
@@ -179,8 +180,9 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
           setLoadingPhase('ready')
           setLoadingProgress(100)
           
-          if (currentParentId === 0 && data?.length > 0) {
-            if (type === "tv" && season) {
+          if (data?.length > 0 && !hasAutoSelected) {
+            // Priority 1: Match Season Folder at Root
+            if (currentParentId === 0 && type === "tv" && season) {
               const seasonFolder = data.find((f: any) => f.is_dir && (
                 f.file_name.toLowerCase().includes(`season ${season}`) || 
                 f.file_name.toLowerCase().includes(`s${String(season).padStart(2, '0')}`)
@@ -191,6 +193,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
               }
             }
 
+            // Priority 2: Match Episode File (Anywhere)
             const epPattern = episode ? `(s${String(season).padStart(2, '0')}e${String(episode).padStart(2, '0')}|${season}x${String(episode).padStart(2, '0')}|e${String(episode).padStart(2, '0')}|^${episode}\\s|\\s${episode}\\.|\\(${episode}\\))` : ""
             const episodeRegex = episode ? new RegExp(epPattern, 'i') : null
             
@@ -199,9 +202,12 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
               if (!isVideo) return false
               if (!episodeRegex) return true 
               return episodeRegex.test(f.file_name)
-            }) || data.find((f: any) => f.file_name.match(/\.(mp4|mkv|avi|webm|m3u8)$/i)) || data[0]
+            })
 
-            if (targetFile) handleFileSelect(targetFile)
+            if (targetFile && !targetFile.is_dir) {
+              setHasAutoSelected(true)
+              handleFileSelect(targetFile)
+            }
           }
         }
       })
@@ -228,7 +234,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
   }
 
   return (
-    <section className="space-y-6 rounded-3xl border bg-zinc-950/50 p-6 backdrop-blur-xl shadow-2xl overflow-hidden">
+    <section className="space-y-6 rounded-3xl border bg-zinc-950/50 p-4 sm:p-6 backdrop-blur-xl shadow-2xl">
       {loadingPhase !== 'ready' && (
         <div className="space-y-3 py-4">
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-500">
@@ -242,66 +248,9 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-4 space-y-6">
-           <div className="space-y-4">
-              <div className="flex items-center gap-2 text-zinc-400">
-                 <Search className="size-4" />
-                 <h3 className="text-sm font-bold uppercase tracking-widest">Sources</h3>
-              </div>
-              
-              <div className="space-y-2">
-                 <button 
-                   onClick={() => setSourceType('febbox')}
-                   className={cn(
-                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
-                     sourceType === 'febbox' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
-                   )}
-                 >
-                    <div className="flex items-center gap-3">
-                       <ShieldCheck className="size-5" />
-                       <span className="font-semibold text-xs">Febbox (Premium)</span>
-                    </div>
-                    {loadingPhase !== 'ready' && <Zap className="size-4 animate-pulse text-zinc-500" />}
-                 </button>
-
-                 <button 
-                   onClick={handleVidSrcSelect}
-                   className={cn(
-                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
-                     sourceType === 'vidsrc' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
-                   )}
-                 >
-                    <div className="flex items-center gap-3">
-                       <Share2 className="size-5" />
-                       <span className="font-semibold text-xs">VidSrc (Backup)</span>
-                    </div>
-                 </button>
-              </div>
-           </div>
-
-            {Array.isArray(searchResults) && searchResults.length > 1 && (
-               <div className="space-y-3 pt-4 border-t border-white/5">
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
-                  <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
-                     {searchResults.map(res => (
-                        <button 
-                          key={res.id}
-                          onClick={() => setSelectedResult(res)}
-                          className={cn(
-                            "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
-                            selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                          )}
-                        >
-                           {res.title} ({res.year})
-                        </button>
-                     ))}
-                  </div>
-               </div>
-            )}
-        </div>
-
-        <div className="lg:col-span-8 space-y-6">
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8">
+        {/* Player Column - First on mobile */}
+        <div className="lg:col-span-8 order-1 lg:order-2 space-y-6">
            {sourceType === 'febbox' ? (
               <>
                 {playerUrl ? (
@@ -424,6 +373,64 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ title, t
                   </div>
                </div>
             )}
+        </div>
+
+        {/* Sidebar Column - Second on mobile */}
+        <div className="lg:col-span-4 order-2 lg:order-1 space-y-6">
+           <div className="space-y-4">
+              <div className="flex items-center gap-2 text-zinc-400">
+                 <Search className="size-4" />
+                 <h3 className="text-sm font-bold uppercase tracking-widest">Sources</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                 <button 
+                   onClick={() => setSourceType('febbox')}
+                   className={cn(
+                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
+                     sourceType === 'febbox' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
+                   )}
+                 >
+                    <div className="flex items-center gap-3 text-[10px] sm:text-xs">
+                       <ShieldCheck className="size-4 sm:size-5" />
+                       <span className="font-semibold line-clamp-1">Febbox (Premium)</span>
+                    </div>
+                 </button>
+
+                 <button 
+                   onClick={handleVidSrcSelect}
+                   className={cn(
+                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
+                     sourceType === 'vidsrc' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
+                   )}
+                 >
+                    <div className="flex items-center gap-3 text-[10px] sm:text-xs">
+                       <Share2 className="size-4 sm:size-5" />
+                       <span className="font-semibold line-clamp-1">VidSrc (Backup)</span>
+                    </div>
+                 </button>
+              </div>
+           </div>
+
+             {Array.isArray(searchResults) && searchResults.length > 1 && (
+                <div className="space-y-3 pt-4 border-t border-white/5 hidden lg:block">
+                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
+                   <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
+                      {searchResults.map(res => (
+                         <button 
+                           key={res.id}
+                           onClick={() => { setSelectedResult(res); setHasAutoSelected(false); }}
+                           className={cn(
+                             "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
+                             selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+                           )}
+                         >
+                            {res.title} ({res.year})
+                         </button>
+                      ))}
+                   </div>
+                </div>
+             )}
         </div>
       </div>
     </section>

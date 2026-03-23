@@ -213,7 +213,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border bg-black shadow-2xl ring-1 ring-white/10">
+    <div className="relative aspect-video w-full rounded-2xl border bg-black shadow-2xl ring-1 ring-white/10">
       {/* ArtPlayer mount point */}
       <div ref={containerRef} className="size-full" />
 
