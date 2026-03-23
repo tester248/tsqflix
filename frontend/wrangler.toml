@@ -1,0 +1,6 @@
+name = "tsqflix"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+NEXT_PUBLIC_TSQFLIX_API_URL = "https://tsqflix-backend.deezgames.workers.dev"
