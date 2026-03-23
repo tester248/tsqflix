@@ -1,24 +1,22 @@
 {
-  "name": "showbox",
-  "version": "1.0.0",
-  "main": "src/server.js",
+  "name": "tsqflix-worker",
+  "version": "2.0.0",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node --dns-result-order=ipv4first src/server.js",
-    "vercel-start": "node --dns-result-order=ipv4first src/server.js",
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "author": "Tester248",
+  "license": "MIT",
+  "description": "TSQFLIX Backend API for Cloudflare Workers",
   "dependencies": {
-    "cors": "^2.8.5",
+    "cheerio": "^1.2.0",
     "crypto-js": "^4.2.0",
-    "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "jsdom": "^26.0.0",
+    "hono": "^4.12.8",
     "nanoid": "^5.1.5",
-    "node-fetch": "^3.3.2"
+    "wrangler": "^4.76.0"
   }
 }

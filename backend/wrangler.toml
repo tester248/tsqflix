@@ -1,0 +1,11 @@
+name = "tsqflix-backend"
+main = "src/index.js"
+compatibility_date = "2024-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+# Define environment variables here
+[vars]
+CHILD_MODE = "0"
+
+# Note: Secrets like FEBBOX_UI_COOKIE should NOT be hardcoded here.
+# Add it securely using the CLI: `npx wrangler secret put FEBBOX_UI_COOKIE`

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "pages:build": "npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
@@ -64,6 +65,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
     "@ianvs/prettier-plugin-sort-imports": "^3.7.2",
     "@types/node": "^20.4.9",
     "@types/react": "18.2.19",
@@ -81,7 +83,8 @@
     "postcss": "^8.4.24",
     "prettier": "^2.8.8",
     "tailwindcss": "^3.3.2",
-    "typescript": "5.1.6"
+    "typescript": "5.1.6",
+    "wrangler": "^4.76.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --cache --fix",

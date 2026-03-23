@@ -1,29 +1,19 @@
-import fetch from 'node-fetch';
-import { JSDOM } from 'jsdom';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const FEBBOX_UI_COOKIE = process.env.FEBBOX_UI_COOKIE;
+import * as cheerio from 'cheerio';
 
 class FebboxAPI {
-    constructor() {
+    constructor(env) {
         this.baseUrl = 'https://www.febbox.com';
+        this.env = env || {};
         this.headers = this._getDefaultHeaders();
-        this._setAuthCookie(FEBBOX_UI_COOKIE);
+        this._setAuthCookie(this.env.FEBBOX_UI_COOKIE);
     }
 
-    // Set the auth cookie for requests
     _setAuthCookie(cookie) {
-        if (!cookie) {
-            return this;
-        }
-
+        if (!cookie) return this;
         this.headers.cookie = `ui=${cookie}`;
         return this;
     }
 
-    // Default headers used for all requests
     _getDefaultHeaders() {
         return {
             'x-requested-with': 'XMLHttpRequest',
@@ -31,7 +21,6 @@ class FebboxAPI {
         };
     }
 
-    // Helper method to create the referer header for each request
     _setReferer(shareKey) {
         this.headers.referer = `${this.baseUrl}/share/${shareKey}`;
     }
@@ -43,7 +32,6 @@ class FebboxAPI {
         };
     }
 
-    // Fetch JSON data from a URL
     async _fetchJson(url, cookie = null) {
         const response = await fetch(url, { headers: this._buildHeaders(cookie) });
         if (!response.ok) throw new Error(`Error fetching data from ${url}: ${response.statusText}`);
@@ -56,7 +44,6 @@ class FebboxAPI {
         return response.text();
     }
 
-    // Get the list of files from a shared folder
     async getFileList(shareKey, parentId = 0 , cookie = null) {
         const url = `${this.baseUrl}/file/file_share_list?share_key=${shareKey}&pwd=&parent_id=${parentId}&is_html=0`;
         this._setReferer(shareKey);
@@ -65,7 +52,6 @@ class FebboxAPI {
         return data.data.file_list;
     }
 
-    // Get video file qualities and links from a shared video
     async getLinks(shareKey, fid , cookie = null) {
         const url = `${this.baseUrl}/console/video_quality_list?fid=${fid}`;
         this._setReferer(shareKey);
@@ -78,24 +64,21 @@ class FebboxAPI {
             actualHtml = parsed.html || parsed.data || htmlResponse;
         } catch (e) {}
 
-        // Parse HTML response and extract file qualities
-        const dom = new JSDOM(actualHtml);
-        const doc = dom.window.document;
-
-        return this._extractFileQualities(doc);
+        const $ = cheerio.load(actualHtml);
+        return this._extractFileQualities($);
     }
 
-    // Extract file qualities from the parsed DOM
-    _extractFileQualities(doc) {
-        return Array.from(doc.querySelectorAll('.file_quality')).map(fileDiv => {
-            const url = fileDiv.getAttribute('data-url');
-            const quality = fileDiv.getAttribute('data-quality');
-            const name = fileDiv.querySelector('.name')?.textContent.trim();
-            const speed = fileDiv.querySelector('.speed span')?.textContent.trim();
-            const size = fileDiv.querySelector('.size')?.textContent.trim();
+    _extractFileQualities($) {
+        return $('.file_quality').map((_, el) => {
+            const fileDiv = $(el);
+            const url = fileDiv.attr('data-url');
+            const quality = fileDiv.attr('data-quality');
+            const name = fileDiv.find('.name').text().trim();
+            const speed = fileDiv.find('.speed span').text().trim();
+            const size = fileDiv.find('.size').text().trim();
 
             return { url, quality, name, speed, size };
-        });
+        }).get();
     }
 }
 
