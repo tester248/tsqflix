@@ -14,6 +14,8 @@ import { TailwindIndicator } from "@/components/shared/tailwind-indicator"
 import { ThemeProvider } from "@/components/shared/theme-provider"
 import { QueryProvider } from "@/providers/query-provider"
 
+export const runtime = "edge"
+
 export const metadata: Metadata = {
   title: {
     default: siteConfig.name,
