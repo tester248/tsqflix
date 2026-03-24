@@ -7,6 +7,7 @@ declare global {
   interface Window {
     Artplayer: any;
     Hls: any;
+    WebTorrent: any;
   }
 }
 
@@ -64,6 +65,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       await Promise.all([
         load("https://cdn.jsdelivr.net/npm/hls.js@latest"),
         load("https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"),
+        load("https://cdn.jsdelivr.net/npm/webtorrent@latest/dist/webtorrent.min.js"),
       ])
       setIsLoaded(true)
     }
@@ -129,24 +131,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           } else if (window.Hls.isSupported()) {
             const hls = new window.Hls({
               enableWorker: true,
-              // VOD-optimized (NOT lowLatencyMode which is for live streams)
               lowLatencyMode: false,
-              // Deep buffer to handle slow CDN/network between segments
               maxBufferLength: 60,
               maxMaxBufferLength: 120,
-              maxBufferSize: 60 * 1000 * 1000, // 60 MB
+              maxBufferSize: 60 * 1000 * 1000,
               maxBufferHole: 0.5,
-              // Retry policy
               manifestLoadingMaxRetry: 6,
               manifestLoadingRetryDelay: 1000,
               levelLoadingMaxRetry: 6,
               levelLoadingRetryDelay: 1000,
               fragLoadingMaxRetry: 6,
               fragLoadingRetryDelay: 1000,
-              // Send our proxy URL as loader
-              xhrSetup: (xhr: XMLHttpRequest) => {
-                xhr.withCredentials = false
-              },
+              xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = false },
             })
             artInstance.hls = hls
             hls.loadSource(proxyUrl(streamUrl))
@@ -167,7 +163,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               console.warn(`[HLS] ${data.type} error (fatal=${data.fatal}):`, data.details)
               if (!data.fatal) return
               if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
-                // Media errors (e.g. decode failure) — attempt recovery
                 if (recoveryAttempted < 3) {
                   hls.recoverMediaError()
                   recoveryAttempted++
@@ -175,8 +170,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   artInstance.notice.show = "Playback Error — try a different resolution"
                 }
               }
-              // Network errors: do NOT destroy — HLS.js retry policy will re-request
-              // segments automatically, and our proxy cache means retries are instant
             })
 
             artInstance.on("destroy", () => hls.destroy())
@@ -184,6 +177,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             artInstance.notice.show = "Unsupported: m3u8"
           }
         },
+        torrent: function (video: HTMLVideoElement, magnet: string, artInstance: any) {
+          if (!window.WebTorrent) {
+            artInstance.notice.show = "WebTorrent not loaded"
+            return
+          }
+
+          const client = new window.WebTorrent()
+          artInstance.on("destroy", () => client.destroy())
+
+          artInstance.notice.show = "Connecting to P2P network..."
+          
+          client.add(magnet, (torrent: any) => {
+            const file = torrent.files.find((f: any) => f.name.match(/\.(mp4|mkv|avi|webm)$/i))
+            if (file) {
+              artInstance.notice.show = `Streaming: ${file.name}`
+              file.renderTo(video, { autoplay: true, muted: false })
+            } else {
+              artInstance.notice.show = "No video file found in torrent"
+            }
+          })
+
+          client.on("error", (err: any) => {
+            console.error("[WebTorrent Error]", err)
+            artInstance.notice.show = `P2P Error: ${err.message}`
+          })
+        }
       },
     })
 

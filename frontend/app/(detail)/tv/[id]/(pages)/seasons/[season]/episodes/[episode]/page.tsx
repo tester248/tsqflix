@@ -65,6 +65,8 @@ export default async function DetailEpisode({
     append: "credits,images,videos",
   })
 
+  const { imdb_id } = await tmdb.tv.externalIds({ id })
+
   if (!id) return notFound()
 
   return (
@@ -73,6 +75,7 @@ export default async function DetailEpisode({
          <ShowboxStreamPanel 
            title={showDetails.name} 
            tmdbId={id} 
+           imdbId={imdb_id}
            type="tv" 
            season={season} 
            episode={episode} 

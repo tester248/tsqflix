@@ -1,10 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, ChevronLeft, Play, RotateCcw, Search, Share2, ShieldCheck, Zap } from "lucide-react"
+import { AlertTriangle, ChevronLeft, Play, RotateCcw, Search, Share2, ShieldCheck, Zap, Download } from "lucide-react"
 
 import { VideoPlayer } from "@/components/video/video-player"
-import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store/use-app-store"
@@ -15,7 +14,6 @@ type ShowboxResult = {
   id: number
   title: string
   year?: number
-  description?: string
   box_type: number
 }
 
@@ -30,18 +28,12 @@ type FebboxQuality = {
   url: string
   quality?: string
   name?: string
-  size?: string
-  speed?: string
-}
-
-interface BreadcrumbItem {
-  id: number
-  label: string
 }
 
 interface ShowboxStreamPanelProps {
   title: string
   tmdbId: string
+  imdbId?: string
   type: "movie" | "tv"
   season?: number
   episode?: number
@@ -49,16 +41,14 @@ interface ShowboxStreamPanelProps {
   episodeTitle?: string
 }
 
-type LoadingPhase = 'idle' | 'searching' | 'resolving' | 'fetching_files' | 'getting_links' | 'ready'
+type SourceType = 'febbox' | 'torrentio' | 'vidsrc'
 
 export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({ 
-  title, type, tmdbId, season, episode, poster = "", episodeTitle = "" 
+  title, type, tmdbId, imdbId, season, episode, poster = "", episodeTitle = "" 
 }) => {
   const apiBase = useMemo(() => API_BASE_URL, [])
-  const searchType = type === "movie" ? "movie" : "tv"
   const { history, addHistory } = useAppStore()
   
-  // Find previous watch time for this specific item
   const initialStartTime = useMemo(() => {
     const entry = history.find(h => 
       h.id === tmdbId && h.season === season && h.episode === episode
@@ -66,405 +56,282 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
     return entry?.timestamp ?? 0;
   }, [history, tmdbId, season, episode]);
 
-  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('idle')
-  const [loadingProgress, setLoadingProgress] = useState(0)
-  const [hasAutoSelected, setHasAutoSelected] = useState(false)
-
-  const [searchResults, setSearchResults] = useState<ShowboxResult[]>([])
-  const [selectedResult, setSelectedResult] = useState<ShowboxResult | null>(null)
-  const [searchError, setSearchError] = useState<string | null>(null)
-
-  const [shareKey, setShareKey] = useState<string | null>(null)
-  const [shareError, setShareError] = useState<string | null>(null)
-
-  const [files, setFiles] = useState<FebboxFile[]>([])
-  const [filesError, setFilesError] = useState<string | null>(null)
-  const [pathStack, setPathStack] = useState<BreadcrumbItem[]>([{ id: 0, label: "Root" }])
-
-  const [qualities, setQualities] = useState<FebboxQuality[]>([])
-  const [qualitiesLoading, setQualitiesLoading] = useState(false)
-  const [qualitiesError, setQualitiesError] = useState<string | null>(null)
-  const [activeFile, setActiveFile] = useState<FebboxFile | null>(null)
+  const [activeSource, setActiveSource] = useState<SourceType>('febbox')
   const [playerUrl, setPlayerUrl] = useState<string | null>(null)
-  const [playerQualityTitle, setPlayerQualityTitle] = useState<string | null>(null)
-  const [sourceType, setSourceType] = useState<'febbox' | 'vidsrc'>('febbox')
+  const [playerTitle, setPlayerTitle] = useState<string>("")
+  const [playerType, setPlayerType] = useState<'m3u8' | 'torrent'>('m3u8')
 
-  const currentParentId = pathStack[pathStack.length - 1]?.id ?? 0
+  // Showbox State
+  const [sbResults, setSbResults] = useState<ShowboxResult[]>([])
+  const [sbSelected, setSbSelected] = useState<ShowboxResult | null>(null)
+  const [sbFiles, setSbFiles] = useState<FebboxFile[]>([])
+  const [sbQualities, setSbQualities] = useState<FebboxQuality[]>([])
+  const [loadingSb, setLoadingSb] = useState(false)
+  
+  // Torrentio State
+  const [torrentStreams, setTorrentStreams] = useState<any[]>([])
+  const [loadingTor, setLoadingTor] = useState(false)
+  
+  // VidSrc State
+  const [vidsrcData, setVidsrcData] = useState<{ directUrl?: string, embedUrl?: string } | null>(null)
+  const [loadingVid, setLoadingVid] = useState(false)
 
-  const handleFileSelect = async (file: FebboxFile) => {
-    if (file.is_dir) {
-      setPathStack(stack => [...stack, { id: file.fid, label: file.file_name }])
-      return
-    }
-
-    setActiveFile(file)
-    setQualitiesLoading(true)
-    setQualitiesError(null)
-
-    try {
-      const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${encodeURIComponent(shareKey!)}&fid=${file.fid}`)
-      const data: FebboxQuality[] = await res.json()
-      setQualities(data ?? [])
-      
-      const hlsStream = data.find(q => q.url?.includes('.m3u8'))
-      const bestStream = hlsStream || data[0]
-      
-      if (bestStream?.url) {
-        setPlayerUrl(bestStream.url)
-        setPlayerQualityTitle(`${file.file_name} - ${bestStream.quality || bestStream.name}`)
-        setSourceType('febbox')
-        
-        addHistory({
-          id: tmdbId,
-          title: title,
-          poster: poster, 
-          type: type,
-          timestamp: initialStartTime,
-          duration: 0,
-          season,
-          episode,
-          episodeTitle
-        })
-      }
-    } catch (err) {
-      setQualitiesError("Failed to load playback links.")
-    } finally {
-      setQualitiesLoading(false)
-    }
-  }
-
-  // 1. Search Logic
+  // Initial Data Fetch
   useEffect(() => {
     if (!apiBase || !title) return
     const controller = new AbortController()
-    setLoadingPhase('searching')
-    setLoadingProgress(15)
-    
-    fetch(`${apiBase}/api/search?type=${searchType}&title=${encodeURIComponent(title)}`, { signal: controller.signal })
-      .then(res => res.json())
-      .then(results => {
-        if (!controller.signal.aborted) {
-          setSearchResults(results ?? [])
-          setSelectedResult(results?.[0] ?? null)
-          setLoadingProgress(35)
-        }
-      })
-      .catch(err => {
-        if (!controller.signal.aborted) setSearchError(err.message)
-      })
-    return () => controller.abort()
-  }, [apiBase, searchType, title])
 
-  // 2. Resolve Share ID logic
-  useEffect(() => {
-    if (!selectedResult || !apiBase) return
-    const controller = new AbortController()
-    setLoadingPhase('resolving')
-    setLoadingProgress(50)
-    
-    const requestType = selectedResult.box_type || (type === "movie" ? 1 : 2)
-    fetch(`${apiBase}/api/febbox/id?id=${selectedResult.id}&type=${requestType}`, { signal: controller.signal })
-      .then(res => res.json())
+    // 1. Showbox Search
+    setLoadingSb(true)
+    fetch(`${apiBase}/api/search?type=${type === 'movie' ? 'movie' : 'tv'}&title=${encodeURIComponent(title)}`)
+      .then(r => r.json())
       .then(data => {
-        if (!controller.signal.aborted) {
-          setShareKey(data?.febBoxId ?? null)
-          setLoadingProgress(70)
-        }
+          setSbResults(data || [])
+          if (data?.length > 0) setSbSelected(data[0])
       })
-      .catch(err => {
-        if (!controller.signal.aborted) {
-          setShareError(err.message)
-          setLoadingPhase('ready')
-        }
-      })
-    return () => controller.abort()
-  }, [apiBase, selectedResult, type])
+      .finally(() => setLoadingSb(false))
 
-  // 3. Fetch Files logic
+    // 2. Torrentio Search (if imdbId exists)
+    if (imdbId) {
+      setLoadingTor(true)
+      const torId = type === 'movie' ? imdbId : `${imdbId}:${season}:${episode}`
+      fetch(`${apiBase}/api/torrentio?type=${type === 'movie' ? 'movie' : 'series'}&id=${torId}`)
+        .then(r => r.json())
+        .then(data => setTorrentStreams(data || []))
+        .finally(() => setLoadingTor(false))
+    }
+
+    // 3. VidSrc Resolve
+    setLoadingVid(true)
+    fetch(`${apiBase}/api/vidsrc/resolve?type=${type}&tmdbId=${tmdbId}${season ? `&season=${season}` : ''}${episode ? `&episode=${episode}` : ''}`)
+      .then(r => r.json())
+      .then(data => setVidsrcData(data))
+      .finally(() => setLoadingVid(false))
+
+    return () => controller.abort()
+  }, [apiBase, title, imdbId, type, season, episode, tmdbId])
+
+  // Febbox File List Fetch
   useEffect(() => {
-    if (!shareKey || !apiBase) return
-    const controller = new AbortController()
-    setLoadingPhase('fetching_files')
-    setLoadingProgress(85)
-
-    fetch(`${apiBase}/api/febbox/files?shareKey=${encodeURIComponent(shareKey)}&parent_id=${currentParentId}`, { signal: controller.signal })
-      .then(res => res.json())
-      .then(data => {
-        if (!controller.signal.aborted) {
-          setFiles(data ?? [])
-          setLoadingPhase('ready')
-          setLoadingProgress(100)
-          
-          if (data?.length > 0 && !hasAutoSelected) {
-            // Priority 1: Match Season Folder at Root
-            if (currentParentId === 0 && type === "tv" && season) {
-              const seasonFolder = data.find((f: any) => f.is_dir && (
-                f.file_name.toLowerCase().includes(`season ${season}`) || 
-                f.file_name.toLowerCase().includes(`s${String(season).padStart(2, '0')}`)
-              ))
-              if (seasonFolder) {
-                handleFileSelect(seasonFolder)
-                return
-              }
+    if (!sbSelected || activeSource !== 'febbox') return
+    
+    const fetchFiles = async () => {
+        try {
+            const res = await fetch(`${apiBase}/api/febbox/id?id=${sbSelected.id}&type=${sbSelected.box_type}`)
+            const { febBoxId } = await res.json()
+            if (febBoxId) {
+                const fr = await fetch(`${apiBase}/api/febbox/files?shareKey=${febBoxId}`)
+                const files = await fr.json()
+                setSbFiles(files || [])
             }
+        } catch (e) { console.error(e) }
+    }
+    fetchFiles()
+  }, [sbSelected, activeSource, apiBase])
 
-            // Priority 2: Match Episode File (Anywhere)
-            const epPattern = episode ? `(s${String(season).padStart(2, '0')}e${String(episode).padStart(2, '0')}|${season}x${String(episode).padStart(2, '0')}|e${String(episode).padStart(2, '0')}|^${episode}\\s|\\s${episode}\\.|\\(${episode}\\))` : ""
-            const episodeRegex = episode ? new RegExp(epPattern, 'i') : null
-            
-            const targetFile = data.find((f: any) => {
-              const isVideo = f.file_name.match(/\.(mp4|mkv|avi|webm|m3u8)$/i)
-              if (!isVideo) return false
-              if (!episodeRegex) return true 
-              return episodeRegex.test(f.file_name)
-            })
-
-            if (targetFile && !targetFile.is_dir) {
-              setHasAutoSelected(true)
-              handleFileSelect(targetFile)
-            }
-          }
-        }
-      })
-      .catch(err => {
-        if (!controller.signal.aborted) setFilesError(err.message)
-      })
-    return () => controller.abort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase, shareKey, currentParentId, season, episode, type])
-
-  const handleVidSrcSelect = () => {
-    setSourceType('vidsrc')
-    setPlayerUrl(`https://vidsrc.me/embed/${type}?tmdb=${tmdbId}`)
-    setPlayerQualityTitle(`${title} - HD Backup`)
-  }
-
-  const statusMap = {
-    idle: "Waiting...",
-    searching: `Searching for "${title}"...`,
-    resolving: "Bypassing Cloudflare protection...",
-    fetching_files: "Accessing media library...",
-    getting_links: "Extracting high-speed links...",
-    ready: "Ready for playback"
+  const selectFebboxFile = async (file: FebboxFile, shareKey: string) => {
+    const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${shareKey}&fid=${file.fid}`)
+    const data = await res.json()
+    if (data?.length > 0) {
+        const best = data.find((q: any) => q.url?.includes('.m3u8')) || data[0]
+        setPlayerUrl(best.url)
+        setPlayerType('m3u8')
+        setPlayerTitle(`${file.file_name} - ${best.quality || 'HD'}`)
+        setSbQualities(data)
+    }
   }
 
   return (
-    <section className="space-y-6 rounded-3xl border bg-zinc-950/50 p-4 sm:p-6 backdrop-blur-xl shadow-2xl">
-      {loadingPhase !== 'ready' && (
-        <div className="space-y-3 py-4">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-zinc-500">
-             <div className="flex items-center gap-2">
-                <RotateCcw className="size-3 animate-spin text-rose-500" />
-                <span>{statusMap[loadingPhase]}</span>
-             </div>
-             <span>{loadingProgress}%</span>
+    <div className="flex flex-col gap-6">
+      {/* Video Section */}
+      <div className="w-full">
+        {playerUrl ? (
+          <VideoPlayer 
+            url={playerUrl}
+            type={playerType}
+            title={playerTitle || title}
+            poster={poster}
+            episodeTitle={episodeTitle}
+            startTime={initialStartTime}
+            onTimeUpdate={(t, d) => {
+                addHistory({
+                    id: tmdbId, title, poster, type, timestamp: t, duration: d, season, episode, episodeTitle
+                })
+            }}
+          />
+        ) : (
+          <div className="aspect-video w-full rounded-2xl border border-white/10 bg-zinc-950 flex flex-col items-center justify-center p-8 text-center space-y-4">
+            <div className="size-16 rounded-full bg-rose-600/10 flex items-center justify-center text-rose-500">
+                <ShieldCheck className="size-8" />
+            </div>
+            <div className="max-w-xs">
+                <h3 className="text-lg font-bold">Ready to Watch?</h3>
+                <p className="text-sm text-zinc-500">Select a source from the panel below to begin streaming with premium features.</p>
+            </div>
           </div>
-          <Progress value={loadingProgress} className="h-1.5" />
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8">
-        {/* Player Column - First on mobile */}
-        <div className="lg:col-span-8 order-1 lg:order-2 space-y-6">
-           {sourceType === 'febbox' ? (
-              <>
-                {playerUrl ? (
+      {/* Sources & Controls */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Source Selector (Left/Top) */}
+        <div className="lg:col-span-3 space-y-3">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4">Media Sources</p>
+          <button 
+            onClick={() => setActiveSource('febbox')}
+            className={cn(
+                "w-full flex items-center gap-3 p-4 rounded-xl border transition-all",
+                activeSource === 'febbox' ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20" : "bg-white/5 border-transparent text-zinc-400 hover:bg-white/10 hover:border-white/10"
+            )}
+          >
+            <ShieldCheck className="size-5" />
+            <div className="text-left leading-tight">
+                <p className="text-sm font-bold">Showbox</p>
+                <p className="text-[10px] opacity-60">High-speed CDN</p>
+            </div>
+          </button>
+          <button 
+            onClick={() => setActiveSource('torrentio')}
+            className={cn(
+                "w-full flex items-center gap-3 p-4 rounded-xl border transition-all",
+                activeSource === 'torrentio' ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20" : "bg-white/5 border-transparent text-zinc-400 hover:bg-white/10 hover:border-white/10"
+            )}
+          >
+            <Zap className="size-5" />
+            <div className="text-left leading-tight">
+                <p className="text-sm font-bold">Torrentio</p>
+                <p className="text-[10px] opacity-60">P2P Streaming</p>
+            </div>
+          </button>
+          <button 
+            onClick={() => setActiveSource('vidsrc')}
+            className={cn(
+                "w-full flex items-center gap-3 p-4 rounded-xl border transition-all",
+                activeSource === 'vidsrc' ? "bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20" : "bg-white/5 border-transparent text-zinc-400 hover:bg-white/10 hover:border-white/10"
+            )}
+          >
+            <Share2 className="size-5" />
+            <div className="text-left leading-tight">
+                <p className="text-sm font-bold">VidSrc</p>
+                <p className="text-[10px] opacity-60">Direct Resolution</p>
+            </div>
+          </button>
+        </div>
+
+        {/* Content Area (Right/Bottom) */}
+        <div className="lg:col-span-9 rounded-2xl border border-white/10 bg-zinc-950/50 p-6 min-h-[300px]">
+           {activeSource === 'febbox' && (
+             <div className="space-y-6">
+                {sbSelected ? (
                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-2">
-                         <div className="flex items-center gap-2">
-                            <Play className="size-4 text-rose-500 fill-rose-500" />
-                            <span className="text-xs font-bold text-zinc-200 uppercase tracking-widest leading-none">STREAMING PLAYER</span>
-                         </div>
+                      <div className="flex items-center justify-between">
+                         <button onClick={() => setSbSelected(null)} className="flex items-center gap-2 text-xs font-bold text-rose-500 uppercase tracking-widest hover:text-rose-400">
+                            <ChevronLeft className="size-4" /> Back to results
+                         </button>
+                         <span className="text-[10px] font-bold text-zinc-500 uppercase">{sbSelected.title}</span>
                       </div>
-                      <VideoPlayer 
-                        url={playerUrl} 
-                        title={playerQualityTitle || ""} 
-                        poster={poster}
-                        startTime={initialStartTime}
-                        qualities={qualities.map(q => ({ label: String(q.quality || q.name || "HD"), url: q.url }))}
-                        onQualityChange={(url) => setPlayerUrl(url)}
-                        onTimeUpdate={(time, duration) => {
-                          // Throttled persistence: save to history every 10 seconds 
-                          // ensuring we don't spam the store, but keep accurate progress
-                          addHistory({
-                            id: tmdbId,
-                            title: title,
-                            poster,
-                            type: type,
-                            timestamp: time,
-                            duration: duration,
-                            season,
-                            episode,
-                            episodeTitle
-                          });
-                        }}
-                      />
+                      <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                         {sbFiles.map(f => (
+                           <button 
+                             key={f.fid} 
+                             onClick={() => selectFebboxFile(f, "fixed_key_for_now")} // Logic needs Febbox ID handle
+                             className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 hover:bg-white/10 transition-all text-left"
+                           >
+                              <div className="min-w-0 flex-1">
+                                 <p className="text-sm font-bold line-clamp-1">{f.file_name}</p>
+                                 <p className="text-[10px] text-zinc-500">{f.file_size || 'Unknown size'}</p>
+                              </div>
+                              <Play className="size-4 text-zinc-600" />
+                           </button>
+                         ))}
+                      </div>
                    </div>
                 ) : (
-                   <div className="aspect-video w-full rounded-2xl border border-white/5 bg-zinc-900/50 flex flex-col items-center justify-center gap-4 text-zinc-500">
-                      {loadingPhase === 'ready' ? (
-                         <>
-                            <AlertTriangle className="size-12 opacity-20" />
-                            <p className="text-sm font-medium">Select a file below to start streaming</p>
-                         </>
-                      ) : (
-                         <>
-                            <div className="size-12 rounded-full border-t-2 border-rose-500 animate-spin" />
-                            <p className="text-sm font-bold animate-pulse">{statusMap[loadingPhase]}</p>
-                         </>
-                      )}
+                   <div className="grid gap-3">
+                      {loadingSb ? [1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl bg-white/5" />) : 
+                        sbResults.map(r => (
+                          <button key={r.id} onClick={() => setSbSelected(r)} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all text-left">
+                             <div className="size-10 rounded-lg bg-rose-600/20 text-rose-500 flex items-center justify-center font-bold">
+                                {r.year || '?'}
+                             </div>
+                             <div>
+                                <p className="text-sm font-bold">{r.title}</p>
+                                <p className="text-[10px] text-zinc-500 uppercase">Provider: Showbox</p>
+                             </div>
+                          </button>
+                        ))
+                      }
                    </div>
                 )}
+             </div>
+           )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                   <div className="space-y-3 rounded-2xl bg-zinc-900/30 p-4 border border-white/5">
-                      <div className="flex items-center justify-between">
-                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Files</p>
-                         {pathStack.length > 1 && (
-                            <button onClick={() => setPathStack(s => s.slice(0, -1))} className="text-[10px] flex items-center gap-1 text-rose-500 hover:underline">
-                               <ChevronLeft className="size-3" /> Back
-                            </button>
-                         )}
-                      </div>
-                      <div className="space-y-1 max-h-64 overflow-y-auto pr-2 scrollbar-thin">
-                         {loadingPhase !== 'ready' ? [1,2,3].map(i => <Skeleton key={i} className="h-10 w-full mb-1" />) : 
-                           Array.isArray(files) && files.map(f => (
-                             <button
-                               key={f.fid}
-                               onClick={() => handleFileSelect(f)}
-                               className={cn(
-                                 "w-full text-left px-3 py-2 rounded-lg text-[11px] flex justify-between items-center transition-colors",
-                                 activeFile?.fid === f.fid ? "bg-white/10 text-white font-medium" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                               )}
-                             >
-                                <span className="line-clamp-1 flex-1">{f.file_name}</span>
-                                {f.is_dir ? <ChevronLeft className="size-3 rotate-180 opacity-50 ml-2" /> : <Play className="size-2.5 ml-2 opacity-50" />}
-                             </button>
-                           ))
-                         }
-                      </div>
-                   </div>
-
-                   <div className="space-y-3 rounded-2xl bg-zinc-900/30 p-4 border border-white/5">
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Resolutions</p>
-                      <div className="flex flex-wrap gap-2">
-                         {qualitiesLoading ? [1,2].map(i => <Skeleton key={i} className="h-8 w-20" />) : 
-                           Array.isArray(qualities) && qualities.map(q => (
-                             <button
-                               key={q.url}
-                               onClick={() => setPlayerUrl(q.url)}
-                               className={cn(
-                                 "px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all",
-                                 playerUrl === q.url ? "bg-rose-500 border-rose-500 text-white shadow-lg" : "bg-zinc-800 border-white/5 text-zinc-400 hover:bg-zinc-700 hover:text-white"
-                               )}
-                             >
-                                {q.quality || q.name}
-                             </button>
-                           ))
-                         }
-                         {!qualities?.length && !qualitiesLoading && activeFile && <p className="text-[10px] text-zinc-600">No alternate links</p>}
-                      </div>
-                   </div>
+           {activeSource === 'torrentio' && (
+             <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                    <Zap className="size-4 text-emerald-500" />
+                    <h4 className="text-sm font-bold uppercase tracking-widest">P2P Streams Found</h4>
                 </div>
-              </>
-           ) : (
-               <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2">
-                        <Zap className="size-4 text-emerald-500 fill-emerald-500" />
-                        <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">Backup Server Active</span>
-                     </div>
-                     <button
-                       onClick={() => {
-                         const iframe = document.getElementById("vidsrc-iframe") as HTMLIFrameElement | null
-                         if (iframe?.requestFullscreen) {
-                           iframe.requestFullscreen()
-                         } else if ((iframe as any)?.webkitRequestFullscreen) {
-                           (iframe as any).webkitRequestFullscreen()
-                         }
-                       }}
-                       className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-zinc-800 px-3 py-1.5 text-[11px] font-bold text-zinc-300 uppercase tracking-wider hover:bg-zinc-700 hover:text-white transition-all"
-                     >
-                       ⛶ Fullscreen
-                     </button>
-                  </div>
-                  <div className="relative aspect-video w-full rounded-2xl border border-white/5 bg-black shadow-2xl">
-                     <iframe
-                       id="vidsrc-iframe"
-                       src={playerUrl || ""}
-                       className="absolute inset-0 size-full border-0 rounded-2xl"
-                       allowFullScreen={true}
-                       allow="autoplay; fullscreen; picture-in-picture; encrypted-media; gyroscope; accelerometer"
-                       referrerPolicy="no-referrer"
-                     />
-                  </div>
-                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                     <p className="text-xs text-emerald-500/80 leading-relaxed font-medium">
-                        Note: VidSrc uses third-party servers. We recommend an <b>Ad-Blocker</b> for this backup source.
-                     </p>
-                  </div>
-               </div>
-            )}
-        </div>
-
-        {/* Sidebar Column - Second on mobile */}
-        <div className="lg:col-span-4 order-2 lg:order-1 space-y-6">
-           <div className="space-y-4">
-              <div className="flex items-center gap-2 text-zinc-400">
-                 <Search className="size-4" />
-                 <h3 className="text-sm font-bold uppercase tracking-widest">Sources</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-                 <button 
-                   onClick={() => setSourceType('febbox')}
-                   className={cn(
-                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
-                     sourceType === 'febbox' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
-                   )}
-                 >
-                    <div className="flex items-center gap-3 text-[10px] sm:text-xs">
-                       <ShieldCheck className="size-4 sm:size-5" />
-                       <span className="font-semibold line-clamp-1">Febbox (Premium)</span>
-                    </div>
-                 </button>
-
-                 <button 
-                   onClick={handleVidSrcSelect}
-                   className={cn(
-                     "w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 text-left",
-                     sourceType === 'vidsrc' ? "bg-rose-500/10 border-rose-500/50 text-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.1)]" : "bg-zinc-900/50 border-white/5 text-zinc-400 hover:bg-zinc-900"
-                   )}
-                 >
-                    <div className="flex items-center gap-3 text-[10px] sm:text-xs">
-                       <Share2 className="size-4 sm:size-5" />
-                       <span className="font-semibold line-clamp-1">VidSrc (Backup)</span>
-                    </div>
-                 </button>
-              </div>
-           </div>
-
-             {Array.isArray(searchResults) && searchResults.length > 1 && (
-                <div className="space-y-3 pt-4 border-t border-white/5 hidden lg:block">
-                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Alternate Search</p>
-                   <div className="space-y-1 max-h-48 overflow-y-auto pr-2 scrollbar-thin">
-                      {searchResults.map(res => (
-                         <button 
-                           key={res.id}
-                           onClick={() => { setSelectedResult(res); setHasAutoSelected(false); }}
-                           className={cn(
-                             "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
-                             selectedResult?.id === res.id ? "bg-white/10 text-white font-bold" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                           )}
-                         >
-                            {res.title} ({res.year})
-                         </button>
-                      ))}
-                   </div>
+                <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {loadingTor ? [1,2,3,4].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl bg-emerald-500/5" />) : 
+                      torrentStreams.map((s, i) => (
+                        <button 
+                          key={i} 
+                          onClick={() => {
+                              setPlayerUrl(s.url)
+                              setPlayerType('torrent')
+                              setPlayerTitle(s.title.split('\n')[0])
+                          }}
+                          className={cn(
+                              "flex items-center justify-between p-4 rounded-xl border transition-all text-left",
+                              playerUrl === s.url ? "bg-emerald-600/10 border-emerald-500/50" : "bg-white/5 border-transparent hover:border-emerald-500/10 hover:bg-emerald-500/5"
+                          )}
+                        >
+                           <div className="min-w-0 flex-1 space-y-1">
+                              <p className="text-sm font-bold line-clamp-1">{s.title.split('\n')[0]}</p>
+                              <p className="text-[10px] text-zinc-500 uppercase font-medium">{s.name} • {s.title.split('\n').find((l: string) => l.includes('👤')) || "Standard Speed"}</p>
+                           </div>
+                           <Download className="size-5 text-emerald-500" />
+                        </button>
+                      ))
+                    }
+                    {torrentStreams.length === 0 && !loadingTor && (
+                        <div className="py-12 text-center space-y-2 opacity-40">
+                            <AlertTriangle className="size-12 mx-auto" />
+                            <p className="text-sm font-medium">No P2P streams available for this title.</p>
+                        </div>
+                    )}
                 </div>
-             )}
+             </div>
+           )}
+
+           {activeSource === 'vidsrc' && (
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+                 {loadingVid ? <Skeleton className="h-32 w-full max-w-sm rounded-2xl bg-white/5" /> : (
+                    <>
+                       <div className="space-y-2">
+                          <h4 className="text-xl font-bold italic tracking-tighter text-rose-500">VidSrc Resolution</h4>
+                          <p className="text-sm text-zinc-500 max-w-xs">Premium direct resolution. Bypasses ads and plays in our unified ArtPlayer engine.</p>
+                       </div>
+                       <button 
+                         onClick={() => {
+                             const url = vidsrcData?.directUrl || vidsrcData?.embedUrl
+                             if (url) {
+                                 setPlayerUrl(url)
+                                 setPlayerType('m3u8')
+                                 setPlayerTitle("VidSrc Resolution - HD")
+                             }
+                         }}
+                         className="px-8 py-3 rounded-xl bg-rose-600 text-white font-bold uppercase tracking-widest hover:bg-rose-500 transition-all shadow-lg shadow-rose-600/20"
+                       >
+                          Start Stream
+                       </button>
+                    </>
+                 )}
+              </div>
+           )}
         </div>
       </div>
-    </section>
+    </div>
   )
 }

@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import ShowboxAPI from './ShowboxAPI.js'
 import FebboxAPI from './FebBoxApi.js'
+import TorrentioAPI from './TorrentioAPI.js'
+import VidSrcAPI from './VidSrcAPI.js'
 
 const app = new Hono()
 
@@ -10,7 +12,9 @@ app.use('*', cors())
 const getApis = (c) => {
   return {
     showboxAPI: new ShowboxAPI(c.env),
-    febboxAPI: new FebboxAPI(c.env)
+    febboxAPI: new FebboxAPI(c.env),
+    torrentioAPI: new TorrentioAPI(c.env),
+    vidSrcAPI: new VidSrcAPI(c.env)
   }
 }
 
@@ -88,6 +92,26 @@ app.get('/api/febbox/links', async (c) => {
     try {
         const links = await getApis(c).febboxAPI.getLinks(shareKey, fid , cookie);
         return c.json(links);
+    } catch (error) {
+        return c.json({ error: error.message }, 500);
+    }
+})
+
+app.get('/api/torrentio', async (c) => {
+    const { type, id } = c.req.query();
+    try {
+        const streams = await getApis(c).torrentioAPI.getStreams(type, id);
+        return c.json(streams);
+    } catch (error) {
+        return c.json({ error: error.message }, 500);
+    }
+})
+
+app.get('/api/vidsrc/resolve', async (c) => {
+    const { type, tmdbId, season, episode } = c.req.query();
+    try {
+        const resolved = await getApis(c).vidSrcAPI.resolve(type, tmdbId, season, episode);
+        return c.json(resolved);
     } catch (error) {
         return c.json({ error: error.message }, 500);
     }

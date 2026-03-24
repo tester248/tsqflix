@@ -13,7 +13,7 @@ export const metadata = {
 }
 
 export default async function DetailWatch({ params }: DetailWatchProps) {
-  const { title, original_title, poster_path } = await tmdb.movie.detail({
+  const { title, original_title, poster_path, imdb_id } = await tmdb.movie.detail({
     id: params.id,
   })
 
@@ -25,6 +25,7 @@ export default async function DetailWatch({ params }: DetailWatchProps) {
       <ShowboxStreamPanel 
         title={displayTitle} 
         tmdbId={params.id} 
+        imdbId={imdb_id}
         type="movie" 
         poster={poster_path}
       />
