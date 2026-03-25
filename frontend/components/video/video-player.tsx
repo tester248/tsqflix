@@ -28,7 +28,7 @@ interface VideoPlayerProps {
   poster?: string
   qualities?: { label: string; url: string }[]
   onQualityChange?: (url: string) => void
-  type?: "m3u8" | "torrent"
+  type?: "m3u8" | "torrent" | "embed"
   episodeTitle?: string
   startTime?: number
   onTimeUpdate?: (time: number, duration: number) => void
@@ -50,6 +50,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isVideoReady, setIsVideoReady] = useState(false)
   const [activeTone, setActiveTone] = useState(0)
   const [audioTracks, setAudioTracks] = useState<{ label: string; index: number }[]>([])
   const [activeAudio, setActiveAudio] = useState(0)
@@ -59,26 +60,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // ── Script loader ──────────────────────────────────────────────────────────
   useEffect(() => {
     const loadScripts = async () => {
-      if (window.Artplayer && window.Hls) { setIsLoaded(true); return }
+      if (window.Artplayer && window.Hls && window.WebTorrent) { 
+        setIsLoaded(true); 
+        return; 
+      }
+      
       const load = (src: string) => new Promise<void>(resolve => {
         const s = document.createElement("script")
         s.src = src
+        s.async = true
         s.onload = () => resolve()
         document.head.appendChild(s)
       })
-      await Promise.all([
-        load("https://cdn.jsdelivr.net/npm/hls.js@latest"),
-        load("https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"),
-        load("https://cdn.jsdelivr.net/npm/webtorrent@latest/dist/webtorrent.min.js"),
-      ])
-      setIsLoaded(true)
+
+      try {
+        await Promise.all([
+          load("https://cdn.jsdelivr.net/npm/hls.js@latest"),
+          load("https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"),
+          // Use a more stable bundle URL for webtorrent
+          load("https://cdn.jsdelivr.net/npm/webtorrent@1.9.7/dist/webtorrent.min.js"),
+        ])
+        setIsLoaded(true)
+      } catch (e) {
+        console.error("Script loading failed", e)
+      }
     }
     loadScripts()
   }, [])
 
   // ── ArtPlayer init ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isLoaded || !containerRef.current || !url || !window.Artplayer) return
+    if (!isLoaded || !containerRef.current || !url || !window.Artplayer || type === "embed") return
 
     if (artRef.current) artRef.current.destroy()
 
@@ -86,6 +98,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setActiveTone(0)
     setAudioTracks([])
     setActiveAudio(0)
+    setIsVideoReady(false)
 
     const art = new window.Artplayer({
       container: containerRef.current,
@@ -120,33 +133,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       airplay: true,
       theme: "#E11D48",
       moreVideoAttr: { crossOrigin: "anonymous", preload: "auto" },
-      quality: qualities.map(q => ({ default: q.url === url, html: q.label, url: q.url })),
+      quality: qualities && Array.isArray(qualities) ? qualities.map(q => ({ default: q.url === url, html: q.label, url: q.url })) : [],
       customType: {
         m3u8: function (video: HTMLVideoElement, streamUrl: string, artInstance: any) {
-          // Store video ref for our React overlay to target
           videoRef.current = video
-
-          // Route all HLS requests through our backend proxy to bypass CORS
-          const API_BASE = process.env.NEXT_PUBLIC_TSQFLIX_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000"
+          const API_BASE = process.env.NEXT_PUBLIC_TSQFLIX_API_URL?.replace(/\/$/, "") ?? ""
           const proxyUrl = (u: string) => `${API_BASE}/api/hls-proxy?url=${encodeURIComponent(u)}`
 
           if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            // Safari native HLS - no proxy needed
             video.src = streamUrl
-          } else if (window.Hls.isSupported()) {
+            setIsVideoReady(true)
+          } else if (window.Hls && window.Hls.isSupported()) {
             const hls = new window.Hls({
               enableWorker: true,
-              lowLatencyMode: false,
-              maxBufferLength: 60,
-              maxMaxBufferLength: 120,
-              maxBufferSize: 60 * 1000 * 1000,
-              maxBufferHole: 0.5,
-              manifestLoadingMaxRetry: 6,
-              manifestLoadingRetryDelay: 1000,
-              levelLoadingMaxRetry: 6,
-              levelLoadingRetryDelay: 1000,
-              fragLoadingMaxRetry: 6,
-              fragLoadingRetryDelay: 1000,
               xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = false },
             })
             artInstance.hls = hls
@@ -154,6 +153,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             hls.attachMedia(video)
 
             hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+              setIsVideoReady(true)
               if (hls.audioTracks.length > 1) {
                 setAudioTracks(hls.audioTracks.map((t: any, i: number) => ({
                   label: t.name || `Track ${i + 1}`,
@@ -162,47 +162,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 setActiveAudio(hls.audioTrack)
               }
             })
-
-            let recoveryAttempted = 0
-            hls.on(window.Hls.Events.ERROR, (_: any, data: any) => {
-              console.warn(`[HLS] ${data.type} error (fatal=${data.fatal}):`, data.details)
-              if (!data.fatal) return
-              if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
-                if (recoveryAttempted < 3) {
-                  hls.recoverMediaError()
-                  recoveryAttempted++
-                } else {
-                  artInstance.notice.show = "Playback Error — try a different resolution"
-                }
-              }
-            })
-
             artInstance.on("destroy", () => hls.destroy())
-          } else {
-            artInstance.notice.show = "Unsupported: m3u8"
           }
         },
         torrent: function (video: HTMLVideoElement, magnet: string, artInstance: any) {
+          videoRef.current = video
           if (!window.WebTorrent) {
             artInstance.notice.show = "WebTorrent not loaded"
             return
           }
-
           const client = new window.WebTorrent()
           artInstance.on("destroy", () => client.destroy())
-
           artInstance.notice.show = "Connecting to P2P network..."
-          
           client.add(magnet, (torrent: any) => {
             const file = torrent.files.find((f: any) => f.name.match(/\.(mp4|mkv|avi|webm)$/i))
             if (file) {
               artInstance.notice.show = `Streaming: ${file.name}`
-              file.renderTo(video, { autoplay: true, muted: false })
-            } else {
-              artInstance.notice.show = "No video file found in torrent"
+              file.renderTo(video, { autoplay: true, muted: false }, () => {
+                setIsVideoReady(true)
+              })
             }
           })
-
           client.on("error", (err: any) => {
             console.error("[WebTorrent Error]", err)
             artInstance.notice.show = `P2P Error: ${err.message}`
@@ -228,19 +208,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     })
 
     artRef.current = art
-
     return () => {
       artRef.current?.destroy()
       artRef.current = null
       videoRef.current = null
     }
-  }, [isLoaded, url, qualities, title, poster, onQualityChange])
+  }, [isLoaded, url, qualities, title, poster, type])
 
   // ── Tone mapping – direct DOM write ───────────────────────────────────────
   const applyTone = (idx: number) => {
     setActiveTone(idx)
     setShowToneMenu(false)
-    // Target the <video> element directly via our ref
     const video = videoRef.current ?? containerRef.current?.querySelector("video")
     if (video) video.style.filter = TONE_MAPS[idx].value
   }
@@ -253,37 +231,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   return (
-    <div className="relative aspect-video w-full rounded-2xl border bg-black shadow-2xl ring-1 ring-white/10">
-      {/* ArtPlayer mount point */}
-      <div ref={containerRef} className="size-full" />
+    <div className="relative aspect-video w-full rounded-2xl border bg-black shadow-2xl ring-1 ring-white/10 overflow-hidden">
+      {/* Embed Mode */}
+      {type === "embed" ? (
+        <iframe 
+          src={url} 
+          className="size-full border-0" 
+          allowFullScreen 
+          allow="autoplay; encrypted-media; picture-in-picture"
+          onLoad={() => setIsVideoReady(true)}
+        />
+      ) : (
+        <div ref={containerRef} className="size-full" />
+      )}
 
       {/* Loading overlay */}
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm">
+      {( (!isLoaded || !isVideoReady) ) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 z-50">
           <div className="flex flex-col items-center gap-4">
             <div className="size-10 rounded-full border-t-2 border-rose-600 animate-spin" />
-            <p className="text-sm font-medium text-zinc-400">Loading Premium Player...</p>
+            <p className="text-sm font-medium text-zinc-400 font-mono tracking-tighter">
+                {!isLoaded ? "Setting up engine..." : "Verifying stream source..."}
+            </p>
           </div>
         </div>
       )}
 
       {/* Source label */}
-      {isLoaded && title && (
+      {isLoaded && isVideoReady && title && (
         <div className="pointer-events-none absolute top-4 left-4 z-10 hidden bg-black/60 px-4 py-2 rounded-xl border border-white/10 backdrop-blur-lg md:block">
           <p className="text-xs font-semibold tracking-wider uppercase text-white/70">Source Ready</p>
           <p className="text-sm font-medium text-white line-clamp-1">{title}</p>
         </div>
       )}
 
-      {/* ── Custom React Controls overlay ─────────────────────────────────── */}
-      {isLoaded && (
+      {/* Custom React Controls overlay */}
+      {isLoaded && isVideoReady && type !== "embed" && (
         <div
           className="absolute top-4 right-4 z-20 flex items-center gap-2"
-          // prevent clicks on our overlay from bubbling to ArtPlayer
           onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
         >
-          {/* ── Tone Mapping button ── */}
+          {/* Tone Mapping */}
           <div className="relative">
             <button
               onClick={() => { setShowToneMenu(v => !v); setShowAudioMenu(false) }}
@@ -313,14 +302,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     )}
                   >
                     {t.label}
-                    {i > 0 && <span className="ml-2 text-[9px] text-zinc-500 font-normal">{t.value.split(" ")[0]}</span>}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* ── Audio Track button (only shown when multiple tracks exist) ── */}
+          {/* Audio Tracks */}
           {audioTracks.length > 1 && (
             <div className="relative">
               <button

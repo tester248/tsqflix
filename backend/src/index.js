@@ -38,12 +38,18 @@ app.get('/api/autocomplete', async (c) => {
 })
 
 app.get('/api/search', async (c) => {
-    const { type = 'all', title, page = 1, pagelimit = 20 } = c.req.query();
+    let { type = 'all', title, page = 1, pagelimit = 20 } = c.req.query();
+    
+    // Convert common type strings to Showbox numeric types
+    if (type === 'movie') type = '1';
+    if (type === 'tv') type = '2';
+
     try {
         const results = await getApis(c).showboxAPI.search(title, type, page, pagelimit);
-        return c.json(results);
+        return c.json(Array.isArray(results) ? results : []);
     } catch (error) {
-        return c.json({ error: error.message }, 500);
+        console.error('Search error:', error.message);
+        return c.json([], 200); // Return empty array on failure to keep frontend stable
     }
 })
 
@@ -80,9 +86,10 @@ app.get('/api/febbox/files', async (c) => {
     const cookie = c.req.header('x-auth-cookie') || null;
     try {
         const files = await getApis(c).febboxAPI.getFileList(shareKey, parent_id , cookie);
-        return c.json(files);
+        return c.json(Array.isArray(files) ? files : []);
     } catch (error) {
-        return c.json({ error: error.message }, 500);
+        console.error('Febbox files error:', error.message);
+        return c.json([], 200);
     }
 })
 
@@ -98,12 +105,16 @@ app.get('/api/febbox/links', async (c) => {
 })
 
 app.get('/api/torrentio', async (c) => {
-    const { type, id } = c.req.query();
+    let { type, id } = c.req.query();
     try {
+        // IDs for series come as tt...:1:1. Stremio expects 'series'
+        if (type === 'tv') type = 'series';
+        
         const streams = await getApis(c).torrentioAPI.getStreams(type, id);
-        return c.json(streams);
+        return c.json(Array.isArray(streams) ? streams : []);
     } catch (error) {
-        return c.json({ error: error.message }, 500);
+        console.error('Torrentio error:', error.message);
+        return c.json([], 200);
     }
 })
 

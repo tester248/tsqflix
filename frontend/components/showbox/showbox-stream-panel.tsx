@@ -59,7 +59,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
   const [activeSource, setActiveSource] = useState<SourceType>('febbox')
   const [playerUrl, setPlayerUrl] = useState<string | null>(null)
   const [playerTitle, setPlayerTitle] = useState<string>("")
-  const [playerType, setPlayerType] = useState<'m3u8' | 'torrent'>('m3u8')
+  const [playerType, setPlayerType] = useState<'m3u8' | 'torrent' | 'embed'>('m3u8')
 
   // Showbox State
   const [sbResults, setSbResults] = useState<ShowboxResult[]>([])
@@ -67,6 +67,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
   const [sbFiles, setSbFiles] = useState<FebboxFile[]>([])
   const [sbQualities, setSbQualities] = useState<FebboxQuality[]>([])
   const [loadingSb, setLoadingSb] = useState(false)
+  const [shareKey, setShareKey] = useState<string | null>(null)
   
   // Torrentio State
   const [torrentStreams, setTorrentStreams] = useState<any[]>([])
@@ -86,9 +87,11 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
     fetch(`${apiBase}/api/search?type=${type === 'movie' ? 'movie' : 'tv'}&title=${encodeURIComponent(title)}`)
       .then(r => r.json())
       .then(data => {
-          setSbResults(data || [])
-          if (data?.length > 0) setSbSelected(data[0])
+          const results = Array.isArray(data) ? data : []
+          setSbResults(results)
+          if (results.length > 0) setSbSelected(results[0])
       })
+      .catch(() => setSbResults([]))
       .finally(() => setLoadingSb(false))
 
     // 2. Torrentio Search (if imdbId exists)
@@ -97,7 +100,8 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
       const torId = type === 'movie' ? imdbId : `${imdbId}:${season}:${episode}`
       fetch(`${apiBase}/api/torrentio?type=${type === 'movie' ? 'movie' : 'series'}&id=${torId}`)
         .then(r => r.json())
-        .then(data => setTorrentStreams(data || []))
+        .then(data => setTorrentStreams(Array.isArray(data) ? data : []))
+        .catch(() => setTorrentStreams([]))
         .finally(() => setLoadingTor(false))
     }
 
@@ -106,6 +110,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
     fetch(`${apiBase}/api/vidsrc/resolve?type=${type}&tmdbId=${tmdbId}${season ? `&season=${season}` : ''}${episode ? `&episode=${episode}` : ''}`)
       .then(r => r.json())
       .then(data => setVidsrcData(data))
+      .catch(() => setVidsrcData(null))
       .finally(() => setLoadingVid(false))
 
     return () => controller.abort()
@@ -120,24 +125,35 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
             const res = await fetch(`${apiBase}/api/febbox/id?id=${sbSelected.id}&type=${sbSelected.box_type}`)
             const { febBoxId } = await res.json()
             if (febBoxId) {
+                setShareKey(febBoxId)
                 const fr = await fetch(`${apiBase}/api/febbox/files?shareKey=${febBoxId}`)
                 const files = await fr.json()
-                setSbFiles(files || [])
+                setSbFiles(Array.isArray(files) ? files : [])
+            } else {
+                setSbFiles([])
             }
-        } catch (e) { console.error(e) }
+        } catch (e) { 
+            console.error(e)
+            setSbFiles([])
+        }
     }
     fetchFiles()
   }, [sbSelected, activeSource, apiBase])
 
-  const selectFebboxFile = async (file: FebboxFile, shareKey: string) => {
-    const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${shareKey}&fid=${file.fid}`)
-    const data = await res.json()
-    if (data?.length > 0) {
-        const best = data.find((q: any) => q.url?.includes('.m3u8')) || data[0]
-        setPlayerUrl(best.url)
-        setPlayerType('m3u8')
-        setPlayerTitle(`${file.file_name} - ${best.quality || 'HD'}`)
-        setSbQualities(data)
+  const selectFebboxFile = async (file: FebboxFile) => {
+    if (!shareKey) return
+    try {
+        const res = await fetch(`${apiBase}/api/febbox/links?shareKey=${shareKey}&fid=${file.fid}`)
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+            const best = data.find((q: any) => q.url?.includes('.m3u8')) || data[0]
+            setPlayerUrl(best.url)
+            setPlayerType('m3u8')
+            setPlayerTitle(`${file.file_name} - ${best.quality || 'HD'}`)
+            setSbQualities(data)
+        }
+    } catch (e) {
+        console.error(e)
     }
   }
 
@@ -234,7 +250,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
                          {sbFiles.map(f => (
                            <button 
                              key={f.fid} 
-                             onClick={() => selectFebboxFile(f, "fixed_key_for_now")} // Logic needs Febbox ID handle
+                             onClick={() => selectFebboxFile(f)}
                              className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 hover:bg-white/10 transition-all text-left"
                            >
                               <div className="min-w-0 flex-1">
@@ -280,7 +296,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
                           onClick={() => {
                               setPlayerUrl(s.url)
                               setPlayerType('torrent')
-                              setPlayerTitle(s.title.split('\n')[0])
+                              setPlayerTitle(s.title?.split('\n')[0] || "Unknown Torrent Stream")
                           }}
                           className={cn(
                               "flex items-center justify-between p-4 rounded-xl border transition-all text-left",
@@ -288,8 +304,8 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
                           )}
                         >
                            <div className="min-w-0 flex-1 space-y-1">
-                              <p className="text-sm font-bold line-clamp-1">{s.title.split('\n')[0]}</p>
-                              <p className="text-[10px] text-zinc-500 uppercase font-medium">{s.name} • {s.title.split('\n').find((l: string) => l.includes('👤')) || "Standard Speed"}</p>
+                              <p className="text-sm font-bold line-clamp-1">{s.title?.split('\n')[0] || 'Unknown Source'}</p>
+                              <p className="text-[10px] text-zinc-500 uppercase font-medium">{s.name || 'Torrent'} • {(s.title || '').split('\n').find((l: string) => l.includes('👤')) || "Standard Speed"}</p>
                            </div>
                            <Download className="size-5 text-emerald-500" />
                         </button>
@@ -318,7 +334,7 @@ export const ShowboxStreamPanel: React.FC<ShowboxStreamPanelProps> = ({
                              const url = vidsrcData?.directUrl || vidsrcData?.embedUrl
                              if (url) {
                                  setPlayerUrl(url)
-                                 setPlayerType('m3u8')
+                                 setPlayerType(vidsrcData?.directUrl ? 'm3u8' : 'embed')
                                  setPlayerTitle("VidSrc Resolution - HD")
                              }
                          }}
