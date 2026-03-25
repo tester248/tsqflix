@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, ChevronLeft, Play, RotateCcw, Search, Share2, ShieldCheck, Zap, Download } from "lucide-react"
+import { AlertTriangle, ChevronLeft, Play, Share2, ShieldCheck, Zap, Download } from "lucide-react"
 
 import { VideoPlayer } from "@/components/video/video-player"
 import { Skeleton } from "@/components/ui/skeleton"

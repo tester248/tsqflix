@@ -13,6 +13,7 @@ import { ListResponse } from "../types"
 import {
   TvCreditsRequestParams,
   TvDetailsRequestParams,
+  TvExternalIdsRequestParams,
   TvImagesRequestParams,
   TvListRequestParams,
   TvProvidersRequestParams,
@@ -168,6 +169,18 @@ const providers = ({ id, region, season }: TvProvidersRequestParams) =>
     },
   })
 
+/**
+ * Fetches the external IDs for a specific TV series.
+ *
+ * @param {TvExternalIdsRequestParams} params - The parameters for the TV external IDs request.
+ * @returns {Promise<ExternalIds>} A promise that resolves to the external IDs of the TV series.
+ * @see https://developer.themoviedb.org/reference/tv-series-external-ids
+ */
+const externalIds = ({ id }: TvExternalIdsRequestParams) =>
+  api.fetcher<any>({
+    endpoint: `tv/${id}/external_ids`,
+  })
+
 export const tv = {
   list,
   detail,
@@ -179,6 +192,7 @@ export const tv = {
   videos,
   reviews,
   providers,
+  externalIds,
 }
 
 export * from "./types"

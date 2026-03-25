@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Bookmark, Clock, Play, Trash2 } from "lucide-react"
+import { Bookmark, Clock, Trash2 } from "lucide-react"
 import { useAppStore } from "@/store/use-app-store"
 import { MediaPoster } from "@/components/media/media-poster"
 import { pages } from "@/config"

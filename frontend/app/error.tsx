@@ -12,11 +12,13 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Automatically try to reset/retry after 10 seconds
+    // Automatically try to reset/retry after 10 seconds - DISABLED to prevent request spikes
+    /*
     const timer = setTimeout(() => {
        reset()
     }, 10000)
     return () => clearTimeout(timer)
+    */
   }, [reset])
 
   return (

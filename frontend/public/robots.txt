@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /api/
+Disallow: /search
+Disallow: /movie/*/watch
+Disallow: /tv/*/watch
+Disallow: /tv/*/seasons/*/episodes/*
+Crawl-delay: 10

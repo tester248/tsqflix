@@ -13,6 +13,7 @@ import { ListResponse } from "../types"
 import {
   MovieCreditsRequestParams,
   MovieDetailsRequestParams,
+  MovieExternalIdsRequestParams,
   MovieImagesRequestParams,
   MovieListRequestParams,
   MovieProvidersRequestParams,
@@ -155,6 +156,18 @@ const providers = ({ id, region }: MovieProvidersRequestParams) =>
     },
   })
 
+/**
+ * Fetches the external IDs for a specific movie.
+ *
+ * @param {MovieExternalIdsRequestParams} params - The parameters for the movie external IDs request.
+ * @returns {Promise<ExternalIds>} A promise that resolves to the external IDs of the movie.
+ * @see https://developer.themoviedb.org/reference/movie-external-ids
+ */
+const externalIds = ({ id }: MovieExternalIdsRequestParams) =>
+  api.fetcher<any>({
+    endpoint: `movie/${id}/external_ids`,
+  })
+
 export const movie = {
   list,
   detail,
@@ -165,6 +178,7 @@ export const movie = {
   videos,
   reviews,
   providers,
+  externalIds,
 }
 
 export * from "./types"

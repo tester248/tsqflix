@@ -43,3 +43,7 @@ export type MovieProvidersRequestParams = {
   id: string | number
   region?: string
 }
+
+export type MovieExternalIdsRequestParams = {
+  id: string | number
+}

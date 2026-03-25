@@ -45,9 +45,22 @@ const images = ({ id, season, langs }: TvSeasonsImagesRequestParams) =>
     },
   })
 
+/**
+ * Fetches the external IDs for a specific TV season.
+ *
+ * @param {TvSeasonsDetailsRequestParams} params - The parameters for the TV season external IDs request.
+ * @returns {Promise<ExternalIds>} A promise that resolves to the external IDs of the TV season.
+ * @see https://developer.themoviedb.org/reference/tv-season-external-ids
+ */
+const externalIds = ({ id, season }: TvSeasonsDetailsRequestParams) =>
+  api.fetcher<any>({
+    endpoint: `tv/${id}/season/${season}/external_ids`,
+  })
+
 export const tvSeasons = {
   details,
   credits,
   aggregateCredits,
   images,
+  externalIds,
 }

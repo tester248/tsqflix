@@ -28,13 +28,17 @@ interface VideoPlayerProps {
   poster?: string
   qualities?: { label: string; url: string }[]
   onQualityChange?: (url: string) => void
+  type?: "m3u8" | "torrent"
+  episodeTitle?: string
   startTime?: number
   onTimeUpdate?: (time: number, duration: number) => void
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   url,
+  type,
   title,
+  episodeTitle,
   poster,
   qualities = [],
   onQualityChange,
@@ -86,6 +90,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const art = new window.Artplayer({
       container: containerRef.current,
       url,
+      type: type || "",
       title,
       poster: poster || "",
       volume: 0.7,

@@ -6,7 +6,7 @@ import { WatchItem } from "@/store/use-app-store"
 import { MediaCard } from "@/components/media/media-card"
 import { MediaPoster } from "@/components/media/media-poster"
 import { Progress } from "@/components/ui/progress"
-import { cn } from "@/lib/utils"
+
 
 interface ContinueWatchingCardProps {
   item: WatchItem

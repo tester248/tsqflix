@@ -50,7 +50,7 @@ const setCache = (key: string, data: string) => {
 const fetchWithRetry = async (
   url: string,
   headers: Record<string, string>,
-  retries = 10
+  retries = 3
 ): Promise<string> => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {

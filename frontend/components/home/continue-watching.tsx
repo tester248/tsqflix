@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAppStore } from "@/store/use-app-store"
-import { TrendCarousel } from "@/components/trend/trend-carousel"
+
 import { History } from "lucide-react"
 import { ContinueWatchingCard } from "./continue-watching-card"
 import {

@@ -68,10 +68,28 @@ const videos = ({
   })
 }
 
+/**
+ * Fetches the external IDs for a specific TV episode.
+ *
+ * @param {Omit<TvEpisodeDetailsRequestParams, "append">} params - The parameters for the TV episode external IDs request.
+ * @returns {Promise<ExternalIds>} A promise that resolves to the external IDs of the TV episode.
+ * @see https://developer.themoviedb.org/reference/tv-episode-external-ids
+ */
+const externalIds = ({
+  id,
+  season: seasonNumber,
+  episode: episodeNumber,
+}: Omit<TvEpisodeDetailsRequestParams, "append">) => {
+  return api.fetcher<any>({
+    endpoint: `tv/${id}/season/${seasonNumber}/episode/${episodeNumber}/external_ids`,
+  })
+}
+
 export const tvEpisodes = {
   details,
   images,
   videos,
+  externalIds,
 }
 
 export * from "./types"

@@ -45,3 +45,7 @@ export type TvProvidersRequestParams = {
   region?: string
   season?: string | number
 }
+
+export type TvExternalIdsRequestParams = {
+  id: string | number
+}

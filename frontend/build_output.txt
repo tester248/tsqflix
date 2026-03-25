@@ -1,0 +1,131 @@
+
+> movies@2.0.0 build
+> next build
+
+  Γû▓ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ Γ£ô Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./app/(detail)/movie/[id]/error.tsx
+23:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+26:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+29:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+30:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+38:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+45:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./app/(detail)/movie/[id]/layout.tsx
+101:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./app/(detail)/tv/[id]/(tabs)/layout.tsx
+100:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./app/(detail)/tv/[id]/error.tsx
+23:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+26:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+29:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+30:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+38:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+45:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./app/error.tsx
+23:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+26:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+29:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+30:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+38:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+45:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./app/library/page.tsx
+4:27  Error: 'Play' is defined but never used.  unused-imports/no-unused-imports
+14:10  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+22:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+28:46  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+32:19  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+44:21  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+49:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+57:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+61:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+64:26  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+68:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./components/home/continue-watching-card.tsx
+9:10  Error: 'cn' is defined but never used.  unused-imports/no-unused-imports
+33:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+33:16  Warning: Classnames 'left-0, right-0' could be replaced by the 'inset-x-0' shorthand!  tailwindcss/enforces-shorthand
+39:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./components/home/continue-watching.tsx
+5:10  Error: 'TrendCarousel' is defined but never used.  unused-imports/no-unused-imports
+27:26  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+39:29  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./components/media/media-play-dialog.tsx
+25:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./components/showbox/showbox-stream-panel.tsx
+4:44  Error: 'RotateCcw' is defined but never used.  unused-imports/no-unused-imports
+4:55  Error: 'Search' is defined but never used.  unused-imports/no-unused-imports
+163:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+164:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+176:12  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+178:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+179:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+182:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+182:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+182:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+195:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+195:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+195:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+208:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+208:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+208:24  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+222:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+228:70  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+231:32  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+233:28  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+238:30  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+241:37  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+253:79  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+254:35  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+259:36  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+271:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+275:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+285:38  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+285:38  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+285:38  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+291:34  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+292:34  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+299:30  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+300:44  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+309:20  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+314:30  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+325:26  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+./components/ui/progress.tsx
+14:16  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+21:7  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+21:7  Warning: Classnames 'h-full, w-full' could be replaced by the 'size-full' shorthand!  tailwindcss/enforces-shorthand
+
+./components/video/video-player.tsx
+237:6  Warning: React Hook useEffect has missing dependencies: 'onTimeUpdate', 'startTime', and 'type'. Either include them or remove the dependency array. If 'onTimeUpdate' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+264:18  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+272:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+273:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+274:14  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+281:11  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+290:26  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+290:26  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+303:20  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+316:37  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+336:22  Warning: Invalid Tailwind CSS classnames order  tailwindcss/classnames-order
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
