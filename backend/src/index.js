@@ -104,6 +104,80 @@ app.get('/api/febbox/links', async (c) => {
     }
 })
 
+app.get('/api/febbox/stream', async (c) => {
+    const { type, title, releaseYear, season, episode } = c.req.query();
+    const cookie = c.req.header('x-auth-cookie') || null;
+
+    if (!title || !type) {
+        return c.json({ error: 'Missing title or type' }, 400);
+    }
+    
+    try {
+        const apis = getApis(c);
+        
+        // 1. Search Showbox by Title
+        const searchResults = await apis.showboxAPI.search(title, type === 'movie' ? 1 : 2, 1, 10);
+        if (!searchResults || searchResults.length === 0) {
+            return c.json({ error: 'Not found on Showbox' }, 404);
+        }
+        
+        let show = searchResults.find(r => r.year == releaseYear) || searchResults[0];
+        const showboxId = show.id;
+        
+        // 2. Get Febbox Share Key
+        const shareKey = await apis.showboxAPI.getFebBoxId(showboxId, type === 'movie' ? 1 : 2);
+        if (!shareKey) {
+            return c.json({ error: 'No FeBox share key found' }, 404);
+        }
+
+        let targetFid = null;
+
+        // 3. Find correct file
+        if (type === 'movie') {
+            const files = await apis.febboxAPI.getFileList(shareKey, 0, cookie);
+            const videoFile = files.find(f => !f.is_dir && f.file_name.match(/\.(mp4|mkv|avi)$/i));
+            if (!videoFile) return c.json({ error: 'No movie file found' }, 404);
+            targetFid = videoFile.fid;
+        } else {
+            let rootFiles = await apis.febboxAPI.getFileList(shareKey, 0, cookie);
+            
+            // Sometimes it's nested in a single folder
+            if (rootFiles.length === 1 && rootFiles[0].is_dir) {
+                rootFiles = await apis.febboxAPI.getFileList(shareKey, rootFiles[0].fid, cookie);
+            }
+            
+            const seasonStr = (season || '').toString();
+            const epStr = (episode || '').toString();
+            
+            const sRegex = new RegExp(`(?<=^|[^a-z0-9])(s|season)\\s*0*${seasonStr}(?=[^a-z0-9]|$)`, 'i');
+            const eRegex = new RegExp(`(?<=^|[^a-z0-9])(e|ep|episode)\\s*0*${epStr}(?=[^a-z0-9]|$)`, 'i');
+            const sXejRegex = new RegExp(`s0*${seasonStr}e0*${epStr}`, 'i');
+            const absEpRegex = new RegExp(`(?<=^|[^a-z0-9])0*${epStr}(?=[^a-z0-9]|\\.[a-z]{3}$)`, 'i');
+            
+            let seasonFolder = rootFiles.find(f => f.is_dir && sRegex.test(f.file_name));
+            
+            let epFiles = seasonFolder 
+                ? await apis.febboxAPI.getFileList(shareKey, seasonFolder.fid, cookie)
+                : rootFiles;
+
+            const episodeFile = epFiles.find(f => !f.is_dir && f.file_name.match(/\.(mp4|mkv|avi)$/i) && (eRegex.test(f.file_name) || sXejRegex.test(f.file_name) || (!seasonFolder && absEpRegex.test(f.file_name))));
+            
+            if (!episodeFile) return c.json({ error: 'Episode file not found' }, 404);
+            targetFid = episodeFile.fid;
+        }
+
+        // 4. Get Links
+        const links = await apis.febboxAPI.getLinks(shareKey, targetFid, cookie);
+        if (!links || links.length === 0) {
+            return c.json({ error: 'No playable links found' }, 404);
+        }
+
+        return c.json({ links });
+    } catch (error) {
+        return c.json({ error: error.message }, 500);
+    }
+})
+
 app.get('/api/torrentio', async (c) => {
     let { type, id } = c.req.query();
     try {
